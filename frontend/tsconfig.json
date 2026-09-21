@@ -1,0 +1,10 @@
+// Knyter bara ihop de två andra tsconfig-filerna: en för vår appkod
+// (tsconfig.app.json) och en för byggverktygen (tsconfig.node.json).
+// De har olika regler eftersom de kör i olika miljöer.
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}
