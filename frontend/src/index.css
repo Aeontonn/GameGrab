@@ -1,0 +1,161 @@
+/* Färgerna är plockade direkt ur docs/design_1.png.
+   Formen är fortfarande avskalad – det är bara paletten som är på plats. */
+
+:root {
+  /* Bakgrunder, ljusare ju närmare betraktaren de ligger. */
+  --bg: #14151a;        /* sidan */
+  --surface: #1b1d25;   /* korten */
+  --line: #23252f;      /* kantlinjer */
+  --line-strong: #2d2f38;
+
+  /* Vita nyanser, från rubriker ner till det minst viktiga. */
+  --text: #edeef2;      /* rubriker och titlar */
+  --text-dim: #888e96;  /* butik, priser, filterval */
+  --text-faint: #585d63; /* fotnoter och teknisk info */
+
+  /* Statusfärger. Inte del av paletten, men de bär information. */
+  --ok: #4ade80;
+  --error: #f87171;
+
+  /* Gör att kryssrutor och andra kontroller ritas mörka av webbläsaren. */
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  font-family: system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+h1 {
+  margin: 0 0 4px;
+}
+
+header p {
+  margin: 0 0 24px;
+  color: var(--text-dim);
+}
+
+/* Filter till vänster, lista till höger. */
+.layout {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+aside h2 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+
+.filter-option {
+  display: block;
+  padding: 4px 0;
+  cursor: pointer;
+  color: var(--text-dim);
+}
+
+/* Det valda filtret ska synas tydligare än de ovalda. */
+.filter-option:has(input:checked) {
+  color: var(--text);
+}
+
+aside button {
+  margin-top: 12px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+aside button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.count {
+  margin: 0 0 16px;
+  color: var(--text-dim);
+}
+
+.count strong {
+  color: var(--text);
+}
+
+.offers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.offers li {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.offers h3 {
+  margin: 4px 0 8px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.store {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+
+.price {
+  margin: 0 0 8px;
+  color: var(--text-dim);
+}
+
+/* Överstruket ordinarie pris ska tona bort bakom reapriset. */
+.price s {
+  color: var(--text-faint);
+}
+
+.price strong,
+.savings {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Länken är sidans viktigaste klick, så den får full styrka. */
+.offers a {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.offers a:hover {
+  border-bottom-color: var(--text);
+}
+
+.status {
+  padding: 24px;
+}
+
+.backend-info {
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.ok {
+  color: var(--ok);
+}
+
+.error {
+  color: var(--error);
+}
