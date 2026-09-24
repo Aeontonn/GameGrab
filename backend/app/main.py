@@ -25,7 +25,7 @@ app = FastAPI(title="GameGrab API")
 # Släpper igenom anrop från vår frontend. Byts mot riktig adress vid lansering.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "https://gamegrab.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
