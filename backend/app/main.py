@@ -51,3 +51,44 @@ def health():
         )
 
     return {"status": "ok", "database": "connected"}
+
+
+# Alla erbjudanden vi har sparade. Det här är listan frontend ritar upp.
+# Gratis först, därefter största rabatten – det mest lockande överst.
+@app.get("/offers")
+def offers():
+    try:
+        with engine.connect() as connection:
+            rows = connection.execute(
+                text("""
+                    SELECT id, title, store, normal_price, sale_price, savings,
+                           is_free, thumb, steam_app_id, claim_url, fetched_at
+                    FROM offers
+                    ORDER BY is_free DESC, savings DESC
+                """)
+            ).mappings().all()
+    except SQLAlchemyError as exc:
+        # Samma felhantering som /health: kom vi inte fram till databasen
+        # säger vi det rakt ut i stället för att svara med en tom lista,
+        # som frontend hade tolkat som "inga erbjudanden finns".
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "database": "disconnected",
+                "detail": str(exc.__cause__ or exc),
+            },
+        )
+
+    # Postgres lämnar pris och rabatt som Decimal, och tidsstämpeln som ett
+    # datumobjekt. Inget av det kan skickas som JSON, så vi gör om dem här.
+    return [
+        {
+            **dict(row),
+            "normal_price": float(row["normal_price"]),
+            "sale_price": float(row["sale_price"]),
+            "savings": float(row["savings"]),
+            "fetched_at": row["fetched_at"].isoformat(),
+        }
+        for row in rows
+    ]
