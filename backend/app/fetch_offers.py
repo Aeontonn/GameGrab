@@ -1,12 +1,12 @@
 """Hämtar gratis- och rabatterbjudanden från CheapShark och sparar dem i databasen.
 
-Körs manuellt när datan ska uppdateras:
+Körs automatiskt var 3:e timme av .github/workflows/fetch-offers.yml.
+
+Kan också köras manuellt, t.ex. för att testa en ändring:
 
     cd backend
     source venv/bin/activate
     python -m app.fetch_offers
-
-Automatisk körning på schema är en senare sprint.
 """
 
 from pathlib import Path
