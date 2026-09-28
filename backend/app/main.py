@@ -17,6 +17,12 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set in backend/.env")
 
+# Erbjudanden hämtas var 3:e timme (se .github/workflows/fetch-offers.yml).
+# Ligger en rad kvar längre än så har hämtningen sannolikt slutat köra, och
+# erbjudandet kan redan ha gått ut hos butiken – då hellre dölja det än visa
+# något som kanske inte längre stämmer.
+STALE_AFTER_HOURS = float(os.getenv("STALE_AFTER_HOURS", "6"))
+
 # Sköter all kontakt med databasen. pool_pre_ping kollar att kopplingen lever, eftersom databaser på nätet stänger oanvända kopplingar.
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
@@ -64,8 +70,10 @@ def offers():
                     SELECT id, title, store, normal_price, sale_price, savings,
                            is_free, thumb, steam_app_id, claim_url, fetched_at
                     FROM offers
+                    WHERE fetched_at > now() - (:stale_after_hours * interval '1 hour')
                     ORDER BY is_free DESC, savings DESC
-                """)
+                """),
+                {"stale_after_hours": STALE_AFTER_HOURS},
             ).mappings().all()
     except SQLAlchemyError as exc:
         # Samma felhantering som /health: kom vi inte fram till databasen

@@ -201,6 +201,14 @@ När frontend är deployad kommer `VITE_API_URL` att peka på den publicerade Fa
 
 Backend behöver `DATABASE_URL` som miljövariabel på Render för att kunna ansluta till databasen i Supabase.
 
+## Uppdatering av erbjudanden
+
+`backend/app/fetch_offers.py` hämtar erbjudanden från CheapShark och sparar dem i databasen. Skriptet körs automatiskt var 3:e timme av GitHub Actions-jobbet `.github/workflows/fetch-offers.yml` (kan också startas manuellt därifrån).
+
+För att jobbet ska kunna nå databasen behöver repots hemlighet `DATABASE_URL` finnas under **Settings → Secrets and variables → Actions** i GitHub och peka på samma databas som backend använder.
+
+`/offers`-endpointen döljer erbjudanden som är äldre än `STALE_AFTER_HOURS` timmar (standard 6, dubbelt så långt som hämtningsintervallet) så att ett missat schemalagt jobb inte visar erbjudanden som kan ha gått ut hos butiken.
+
 ## CORS
 
 Under lokal utveckling tillåter backend anrop från:

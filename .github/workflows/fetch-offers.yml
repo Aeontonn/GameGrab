@@ -1,0 +1,39 @@
+# Håller erbjudandena i databasen färska.
+# Körs automatiskt var 3:e timme, och kan även startas manuellt från
+# GitHub-fliken Actions.
+#
+# DATABASE_URL måste finnas som ett repo-secret (Settings → Secrets and
+# variables → Actions) och peka på samma Supabase-databas som backend
+# använder på Render.
+
+name: Hämta erbjudanden
+
+on:
+  schedule:
+    - cron: "0 */3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  fetch:
+    name: Kör fetch_offers.py
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - name: Hämta och spara erbjudanden
+        run: python -m app.fetch_offers
