@@ -3,6 +3,10 @@ import { API_URL, fetchOffers } from './api'
 import { STORES } from './types'
 import type { Offer } from './types'
 
+// Kryssar i värdet om det är omarkerat, kryssar ur det om det redan är valt.
+const toggle = (list: string[], value: string) =>
+  list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
+
 // De lägen sidan kan vara i medan den hämtar erbjudanden.
 type Load =
   | { state: 'loading' }
@@ -15,6 +19,9 @@ function App() {
   // Vilka butiker som är förkryssade. Tom lista betyder "visa alla".
   const [stores, setStores] = useState<string[]>([])
 
+  // Vilka genrer som är förkryssade. Tom lista betyder "visa alla".
+  const [genres, setGenres] = useState<string[]>([])
+
   // Körs en gång när sidan laddas: hämta erbjudandena från backend.
   useEffect(() => {
     fetchOffers()
@@ -22,18 +29,27 @@ function App() {
       .catch((error: Error) => setLoad({ state: 'error', message: error.message }))
   }, [])
 
-  // Filtrerar om bara när listan eller kryssrutorna faktiskt ändrats.
+  // Genrerna som faktiskt finns bland spelen, i bokstavsordning. Hämtas ur
+  // datan i stället för att skrivas in, så att filtret aldrig visar en genre
+  // som inte har några spel.
+  const allGenres = useMemo(() => {
+    if (load.state !== 'ok') return []
+    const found = new Set(load.offers.flatMap((offer) => offer.genres))
+    return [...found].sort((a, b) => a.localeCompare(b, 'en'))
+  }, [load])
+
+  // Ett spel visas om det matchar någon av de valda butikerna och någon av
+  // de valda genrerna. Är en grupp tom filtrerar den inte alls.
   const visible = useMemo(() => {
     if (load.state !== 'ok') return []
-    if (stores.length === 0) return load.offers
-    return load.offers.filter((offer) => stores.includes(offer.store))
-  }, [load, stores])
-
-  // Kryssar i butiken om den är omarkerad, kryssar ur om den redan är vald.
-  const toggleStore = (store: string) =>
-    setStores((current) =>
-      current.includes(store) ? current.filter((s) => s !== store) : [...current, store],
+    return load.offers.filter(
+      (offer) =>
+        (stores.length === 0 || stores.includes(offer.store)) &&
+        (genres.length === 0 || offer.genres.some((genre) => genres.includes(genre))),
     )
+  }, [load, stores, genres])
+
+  const anyFilter = stores.length > 0 || genres.length > 0
 
   if (load.state === 'loading') {
     return <p className="status">Hämtar erbjudanden…</p>
@@ -64,13 +80,32 @@ function App() {
               <input
                 type="checkbox"
                 checked={stores.includes(store)}
-                onChange={() => toggleStore(store)}
+                onChange={() => setStores((current) => toggle(current, store))}
               />
               {store}
             </label>
           ))}
 
-          <button type="button" onClick={() => setStores([])} disabled={stores.length === 0}>
+          <h2>Genre</h2>
+          {allGenres.map((genre) => (
+            <label key={genre} className="filter-option">
+              <input
+                type="checkbox"
+                checked={genres.includes(genre)}
+                onChange={() => setGenres((current) => toggle(current, genre))}
+              />
+              {genre}
+            </label>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => {
+              setStores([])
+              setGenres([])
+            }}
+            disabled={!anyFilter}
+          >
             Visa alla
           </button>
         </aside>
@@ -86,6 +121,8 @@ function App() {
                 <span className="store">{offer.store}</span>
 
                 <h3>{offer.title}</h3>
+
+                {offer.genres.length > 0 && <p className="genres">{offer.genres.join(' · ')}</p>}
 
                 <p className="price">
                   {offer.is_free ? (
