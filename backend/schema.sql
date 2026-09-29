@@ -30,6 +30,9 @@ CREATE TABLE IF NOT EXISTS offers (
 
     claim_url       TEXT NOT NULL,
 
+    -- Spelets genrer enligt Steam, på engelska. Tom lista om Steam inte känner till spelet.
+    genres          TEXT[] NOT NULL DEFAULT '{}',
+
     -- När raden senast hämtades. Visar hur färsk datan är.
     fetched_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -37,3 +40,7 @@ CREATE TABLE IF NOT EXISTS offers (
 -- Frontend filtrerar på butik och sorterar på rabatt, så de kolumnerna får index.
 CREATE INDEX IF NOT EXISTS offers_store_idx ON offers (store);
 CREATE INDEX IF NOT EXISTS offers_savings_idx ON offers (savings DESC);
+
+-- Lägger till genrer i en tabell som skapades innan kolumnen fanns.
+-- Befintliga rader får en tom lista tills nästa hämtning fyller i dem.
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS genres TEXT[] NOT NULL DEFAULT '{}';
