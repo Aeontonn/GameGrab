@@ -44,3 +44,18 @@ CREATE INDEX IF NOT EXISTS offers_savings_idx ON offers (savings DESC);
 -- Lägger till genrer i en tabell som skapades innan kolumnen fanns.
 -- Befintliga rader får en tom lista tills nästa hämtning fyller i dem.
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS genres TEXT[] NOT NULL DEFAULT '{}';
+
+-- Spel som alltid är gratis (free to play), separat från tidsbegränsade
+-- erbjudanden i offers. Fylls av fetch_free_games.py.
+CREATE TABLE IF NOT EXISTS free_games (
+    id              SERIAL PRIMARY KEY,
+    steam_app_id    TEXT UNIQUE NOT NULL,
+    title           TEXT NOT NULL,
+    genres          TEXT[] NOT NULL DEFAULT '{}',
+
+    -- Plats i listan, 1 = mest spelad. Behåller Steams ordning.
+    rank            INTEGER NOT NULL,
+
+    claim_url       TEXT NOT NULL,
+    fetched_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);

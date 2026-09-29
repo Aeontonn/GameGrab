@@ -100,6 +100,7 @@ def steam_details(app_id: str) -> dict | None:
     data = payload["data"]
     return {
         "type": data.get("type"),
+        "is_free": bool(data.get("is_free")),
         "genres": [
             genre["description"]
             for genre in data.get("genres", [])
@@ -180,7 +181,7 @@ def gog_details(title: str) -> dict | None:
     # GOG kallar även hela spel som Fallout och Fallout 2 för pack, eftersom de
     # levereras med extramaterial. Riktiga paket fångas redan av titelregeln.
     kind = "dlc" if match.get("productType") == "dlc" else "game"
-    return {"type": kind, "genres": genres}
+    return {"type": kind, "is_free": False, "genres": genres}
 
 
 def classify(deal: dict) -> tuple[bool, list[str]]:

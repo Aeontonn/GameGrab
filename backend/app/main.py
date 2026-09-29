@@ -108,3 +108,30 @@ def offers():
         }
         for row in rows
     ]
+
+
+# Spel som alltid är gratis (free to play), mest spelade först. Hämtas av
+# fetch_free_games.py en gång per dygn. Ingen färskhetskoll som i /offers:
+# ett free to play-spel slutar inte vara gratis över en natt.
+@app.get("/free-games")
+def free_games():
+    try:
+        with engine.connect() as connection:
+            rows = connection.execute(
+                text("""
+                    SELECT id, title, steam_app_id, claim_url, genres
+                    FROM free_games
+                    ORDER BY rank
+                """)
+            ).mappings().all()
+    except SQLAlchemyError as exc:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "database": "disconnected",
+                "detail": str(exc.__cause__ or exc),
+            },
+        )
+
+    return [dict(row) for row in rows]
