@@ -24,10 +24,11 @@ const timeLeft = (endsAt: string | null): string | null => {
   return days === 1 ? '1 dag kvar' : `${days} dagar kvar`
 }
 
-// "Slutar snart" visar erbjudanden som går ut inom så här många dagar.
-const ENDING_SOON_DAYS = 7
+// Valet "Slutar inom 2 dagar" visar erbjudanden som går ut inom så här många dagar.
+// Med 7 dagar kom nästan alla erbjudanden med, så valet sa ingenting.
+const ENDING_SOON_DAYS = 2
 
-// Ett erbjudande som kort. Används både i "Slutar snart" och i huvudlistan.
+// Ett erbjudande som kort.
 function OfferCard({ offer }: { offer: Offer }) {
   const left = timeLeft(offer.ends_at)
 
@@ -85,6 +86,10 @@ function App() {
   // Vilka genrer som är förkryssade. Tom lista betyder "visa alla".
   const [genres, setGenres] = useState<string[]>([])
 
+  // Om bara erbjudanden som slutar snart ska visas. Av från början – besökaren
+  // får aktivt välja det.
+  const [endingSoonOnly, setEndingSoonOnly] = useState(false)
+
   // Körs en gång när sidan laddas: hämta erbjudandena från backend.
   useEffect(() => {
     fetchOffers()
@@ -117,29 +122,27 @@ function App() {
 
   // Ett spel visas om det matchar någon av de valda butikerna och någon av
   // de valda genrerna. Är en grupp tom filtrerar den inte alls.
+  //
+  // Med "Slutar inom 2 dagar" ikryssat visas bara erbjudanden med känt
+  // slutdatum inom gränsen, och det som slutar först hamnar överst.
+  // Gränsen följer det kortet visar: allt som står som "2 dagar kvar" eller
+  // mindre ska med. Kortet avrundar nedåt, så 2 dagar och 8 timmar visas som
+  // "2 dagar kvar" – därför går gränsen vid ett dygn extra.
   const visible = useMemo(() => {
     if (load.state !== 'ok') return []
-    return load.offers.filter(
+
+    const filtered = load.offers.filter(
       (offer) =>
         (stores.length === 0 || stores.includes(offer.store)) &&
         (genres.length === 0 || offer.genres.some((genre) => genres.includes(genre))),
     )
-  }, [load, stores, genres])
+    if (!endingSoonOnly) return filtered
 
-  // Erbjudanden som går ut inom en vecka, det som slutar först överst.
-  // Bygger på de filtrerade erbjudandena, så att butik och genre gäller här
-  // också. Spelen finns kvar i huvudlistan – sektionen är en genväg, inte
-  // en egen hög. Erbjudanden utan känt slutdatum kan inte hamna här.
-  //
-  // Gränsen följer det kortet visar: allt som står som "7 dagar kvar" eller
-  // mindre ska med. Kortet avrundar nedåt, så 7 dagar och 8 timmar visas som
-  // "7 dagar kvar" – därför går gränsen vid 8 hela dygn, inte 7.
-  const endingSoon = useMemo(() => {
     const limit = openedAt + (ENDING_SOON_DAYS + 1) * 24 * 3_600_000
-    return visible
+    return filtered
       .filter((offer) => offer.ends_at && new Date(offer.ends_at).getTime() < limit)
       .sort((a, b) => new Date(a.ends_at!).getTime() - new Date(b.ends_at!).getTime())
-  }, [visible, openedAt])
+  }, [load, stores, genres, endingSoonOnly, openedAt])
 
   // Genrefiltret gäller även "Alltid gratis". Butiksfiltret gör det inte,
   // eftersom de spelen nästan alla ligger på Steam.
@@ -151,7 +154,7 @@ function App() {
     [freeGames, genres],
   )
 
-  const anyFilter = stores.length > 0 || genres.length > 0
+  const anyFilter = stores.length > 0 || genres.length > 0 || endingSoonOnly
 
   if (load.state === 'loading') {
     return <p className="status">Hämtar erbjudanden…</p>
@@ -205,34 +208,33 @@ function App() {
             onClick={() => {
               setStores([])
               setGenres([])
+              setEndingSoonOnly(false)
             }}
             disabled={!anyFilter}
           >
             Visa alla
           </button>
+
+          {/* Ligger under "Visa alla", avskilt från butik och genre: det är ett
+              eget val man gör aktivt, inte ett av de vanliga filtren. */}
+          <div className="time-filter">
+            <h2>Tid kvar</h2>
+            <label className="filter-option">
+              <input
+                type="checkbox"
+                checked={endingSoonOnly}
+                onChange={() => setEndingSoonOnly((current) => !current)}
+              />
+              Slutar inom {ENDING_SOON_DAYS} dagar
+            </label>
+          </div>
         </aside>
 
         <main>
-          {/* Döljs helt när inget slutar inom en vecka, i stället för att
-              visa en tom rubrik. */}
-          {endingSoon.length > 0 && (
-            <section className="ending-soon">
-              <h2>Slutar snart</h2>
-              <p className="count">
-                <strong>{endingSoon.length}</strong> erbjudanden går ut inom {ENDING_SOON_DAYS} dagar
-              </p>
-
-              <ul className="offers">
-                {endingSoon.map((offer) => (
-                  <OfferCard key={offer.id} offer={offer} />
-                ))}
-              </ul>
-            </section>
-          )}
-
           <h2>Gratis och på rea</h2>
           <p className="count">
-            <strong>{visible.length}</strong> erbjudanden
+            <strong>{visible.length}</strong>{' '}
+            {endingSoonOnly ? `erbjudanden slutar inom ${ENDING_SOON_DAYS} dagar` : 'erbjudanden'}
           </p>
 
           <ul className="offers">
