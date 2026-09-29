@@ -23,6 +23,10 @@ if not DATABASE_URL:
 # något som kanske inte längre stämmer.
 STALE_AFTER_HOURS = float(os.getenv("STALE_AFTER_HOURS", "6"))
 
+# GameGrab visar bara riktiga fynd: gratisspel och minst 80 % rabatt.
+# Mindre rabatter finns kvar i databasen men lämnas aldrig ut.
+MIN_SAVINGS_PERCENT = float(os.getenv("MIN_SAVINGS_PERCENT", "80"))
+
 # Sköter all kontakt med databasen. pool_pre_ping kollar att kopplingen lever, eftersom databaser på nätet stänger oanvända kopplingar.
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
@@ -59,7 +63,7 @@ def health():
     return {"status": "ok", "database": "connected"}
 
 
-# Alla erbjudanden vi har sparade. Det här är listan frontend ritar upp.
+# Erbjudandena frontend ritar upp: färska, och antingen gratis eller minst 80 procent rabatt.
 # Gratis först, därefter största rabatten – det mest lockande överst.
 @app.get("/offers")
 def offers():
@@ -71,9 +75,13 @@ def offers():
                            is_free, thumb, steam_app_id, claim_url, fetched_at
                     FROM offers
                     WHERE fetched_at > now() - (:stale_after_hours * interval '1 hour')
+                      AND (is_free OR savings >= :min_savings)
                     ORDER BY is_free DESC, savings DESC
                 """),
-                {"stale_after_hours": STALE_AFTER_HOURS},
+                {
+                    "stale_after_hours": STALE_AFTER_HOURS,
+                    "min_savings": MIN_SAVINGS_PERCENT,
+                },
             ).mappings().all()
     except SQLAlchemyError as exc:
         # Samma felhantering som /health: kom vi inte fram till databasen
