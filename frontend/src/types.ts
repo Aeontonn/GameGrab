@@ -23,6 +23,9 @@ export type Offer = {
   // Spelets genrer enligt Steam, på engelska. Tom lista om Steam inte känner till spelet.
   genres: string[]
 
+  // När erbjudandet går ut, som ISO-tid. null när butiken inte uppger något.
+  ends_at: string | null
+
   // När raden senast hämtades från CheapShark.
   fetched_at: string
 }

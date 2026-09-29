@@ -20,7 +20,12 @@ export async function fetchOffers(): Promise<Offer[]> {
 
   // En äldre backend skickar inga genrer. Då behandlar vi dem som tomma i
   // stället för att låta sidan krascha när någon filtrerar på genre.
-  return offers.map((offer) => ({ ...offer, genres: offer.genres ?? [] }))
+  // Samma sak för slutdatum: saknas fältet betyder det "okänt".
+  return offers.map((offer) => ({
+    ...offer,
+    genres: offer.genres ?? [],
+    ends_at: offer.ends_at ?? null,
+  }))
 }
 
 export type Health =

@@ -7,6 +7,23 @@ import type { Offer } from './types'
 const toggle = (list: string[], value: string) =>
   list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 
+// Texten som visar hur länge erbjudandet gäller, eller null om butiken inte
+// uppger något slutdatum. Räknar hela dygn framåt, så "2 dagar kvar" betyder
+// att det finns minst 2 dygn kvar – och sista dygnet säger vi timmar, för
+// "0 dagar kvar" låter som att det redan är slut.
+const timeLeft = (endsAt: string | null): string | null => {
+  if (!endsAt) return null
+
+  const msLeft = new Date(endsAt).getTime() - Date.now()
+  if (msLeft <= 0) return 'Slutar snart'
+
+  const hours = Math.floor(msLeft / 3_600_000)
+  if (hours < 24) return hours <= 1 ? 'Mindre än 1 timme kvar' : `${hours} timmar kvar`
+
+  const days = Math.floor(hours / 24)
+  return days === 1 ? '1 dag kvar' : `${days} dagar kvar`
+}
+
 // De lägen sidan kan vara i medan den hämtar erbjudanden.
 type Load =
   | { state: 'loading' }
@@ -134,6 +151,10 @@ function App() {
                   )}{' '}
                   <span className="savings">−{Math.round(offer.savings)}%</span>
                 </p>
+
+                {timeLeft(offer.ends_at) && (
+                  <p className="time-left">{timeLeft(offer.ends_at)}</p>
+                )}
 
                 {/* Lämnar sidan, så vi öppnar i ny flik. */}
                 <a href={offer.claim_url} target="_blank" rel="noopener noreferrer">
