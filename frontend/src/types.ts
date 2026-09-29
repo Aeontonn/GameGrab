@@ -27,5 +27,16 @@ export type Offer = {
   fetched_at: string
 }
 
+// Ett spel som alltid är gratis (free to play), precis som /free-games lämnar ut det.
+export type FreeGame = {
+  id: number
+  title: string
+  steam_app_id: string
+  claim_url: string
+
+  // Spelets genrer enligt Steam, på engelska. Kan vara tom.
+  genres: string[]
+}
+
 // Butikerna vi hämtar från. Används för att bygga filtret.
 export const STORES = ['Steam', 'GOG', 'Epic Games'] as const
