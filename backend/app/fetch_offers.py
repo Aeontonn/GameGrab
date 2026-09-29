@@ -16,6 +16,7 @@ import re
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 import json
+import time
 import os
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -57,14 +58,35 @@ def looks_like_extra(title: str) -> bool:
     return EXCLUDE.search(title) is not None
 
 
-def steam_type(app_id: str) -> str | None:
-    """Frågar Steam vad något faktiskt är: game, dlc, demo, music…
+# Steams genrer som faktiskt är genrer. Steam lägger även innehållsvarningar
+# (Violent, Nudity…), prismodeller (Free To Play) och Early Access i samma
+# lista – de ska inte bli val i genrefiltret. Id:na är desamma på alla språk.
+GAME_GENRE_IDS = {
+    "1",   # Action
+    "2",   # Strategy
+    "3",   # RPG
+    "4",   # Casual
+    "9",   # Racing
+    "18",  # Sports
+    "23",  # Indie
+    "25",  # Adventure
+    "28",  # Simulation
+    "29",  # Massively Multiplayer
+}
+
+
+def steam_details(app_id: str) -> dict | None:
+    """Frågar Steam vad något är (game, dlc, demo, music…) och vilka genrer det har.
 
     Returnerar None om Steam inte känner igen id:t eller inte svarar.
     Det är Steams eget svar, inte en gissning – därför litar vi mer på den
-    här än på titeln.
+    här än på titeln. Genrerna hämtas på engelska, så att sajten fungerar
+    för besökare oavsett språk.
     """
-    url = f"https://store.steampowered.com/api/appdetails?appids={app_id}&filters=basic"
+    url = (
+        "https://store.steampowered.com/api/appdetails"
+        f"?appids={app_id}&filters=basic,genres&l=english"
+    )
 
     try:
         with urlopen(url, timeout=20) as response:
@@ -72,28 +94,120 @@ def steam_type(app_id: str) -> str | None:
     except Exception:
         return None
 
-    return payload["data"]["type"] if payload.get("success") else None
+    if not payload.get("success"):
+        return None
+
+    data = payload["data"]
+    return {
+        "type": data.get("type"),
+        "genres": [
+            genre["description"]
+            for genre in data.get("genres", [])
+            if genre["id"] in GAME_GENRE_IDS
+        ],
+    }
 
 
-def is_game(deal: dict) -> bool:
-    """Ska erbjudandet med till frontend?
+GOG_CATALOG = "https://catalog.gog.com/v1/catalog"
+
+# GOG har egna genrer, de flesta teman som Fantasy och Sci-fi. Bara de med en
+# tydlig motsvarighet bland Steams genrer tas med, översatta till Steams namn,
+# så att filtret inte får både "RPG" och "Role-playing". Resten slängs.
+GOG_TO_STEAM_GENRE = {
+    "Action": "Action",
+    "Shooter": "Action",
+    "Platformer": "Action",
+    "Fighting": "Action",
+    "Adventure": "Adventure",
+    "Point-and-click": "Adventure",
+    "Visual Novel": "Adventure",
+    "Role-playing": "RPG",
+    "JRPG": "RPG",
+    "Strategy": "Strategy",
+    "Simulation": "Simulation",
+    "Managerial": "Simulation",
+    "Building": "Simulation",
+    "Racing": "Racing",
+    "Rally": "Racing",
+    "Off-road": "Racing",
+    "Sports": "Sports",
+}
+
+
+def normalize_title(title: str) -> str:
+    """Gör titlar jämförbara: små bokstäver, bara bokstäver och siffror."""
+    return re.sub(r"[^a-z0-9]", "", title.lower())
+
+
+def gog_details(title: str) -> dict | None:
+    """Reserv för spel utan Steam-id: letar upp titeln i GOG:s katalog.
+
+    Bara exakt samma titel räknas. En lösare sökning hittar lätt fel spel,
+    som Fallout 76 när vi letar efter Fallout.
+
+    Returnerar None om GOG inte hittar spelet eller inte svarar – katalogen
+    är inte officiellt dokumenterad och svarar ibland med fel.
+    """
+    params = urlencode({"query": f"like:{title}", "limit": 10})
+    request = Request(f"{GOG_CATALOG}?{params}", headers={"User-Agent": USER_AGENT})
+
+    # GOG svarar ibland 503 en kort stund. Tre försök med paus emellan räcker
+    # oftast, och gäller bara de få spel som saknar Steam-id.
+    products = None
+    for attempt in range(3):
+        try:
+            with urlopen(request, timeout=20) as response:
+                products = json.load(response).get("products", [])
+            break
+        except Exception:
+            time.sleep(1 + attempt)
+
+    if products is None:
+        return None
+
+    wanted = normalize_title(title)
+    match = next((p for p in products if normalize_title(p["title"]) == wanted), None)
+    if match is None:
+        return None
+
+    genres: list[str] = []
+    for genre in match.get("genres", []):
+        steam_name = GOG_TO_STEAM_GENRE.get(genre["name"])
+        if steam_name and steam_name not in genres:
+            genres.append(steam_name)
+
+    # GOG säger game, dlc eller pack. Bara dlc betyder säkert "inte ett spel":
+    # GOG kallar även hela spel som Fallout och Fallout 2 för pack, eftersom de
+    # levereras med extramaterial. Riktiga paket fångas redan av titelregeln.
+    kind = "dlc" if match.get("productType") == "dlc" else "game"
+    return {"type": kind, "genres": genres}
+
+
+def classify(deal: dict) -> tuple[bool, list[str]]:
+    """Ska erbjudandet med till frontend, och vilka genrer har spelet?
 
     Titeln kollas först eftersom det är gratis. Bara det som överlever
-    kostar oss ett anrop till Steam.
+    kostar oss ett anrop till Steam – och samma anrop ger oss genrerna.
+    Genren hör till spelet, inte butiken, så Steam kan svara även när
+    rean gäller GOG eller Epic. Saknas Steam-id tar GOG:s katalog över.
     """
     if looks_like_extra(deal["title"]):
-        return False
+        return False, []
 
     app_id = deal.get("steamAppID")
 
-    # Utan Steam-id kan vi inte fråga. Då får titelregeln räcka.
-    if not app_id:
-        return True
+    # Med Steam-id frågar vi Steam. Utan id, eller om Steam inte svarar,
+    # försöker vi med GOG:s katalog i stället.
+    details = steam_details(app_id) if app_id else None
+    if details is None:
+        details = gog_details(deal["title"])
 
-    kind = steam_type(app_id)
+    # Svarade ingen av dem vill vi hellre behålla raden än tappa ett riktigt
+    # spel. Spelet visas då utan genre.
+    if details is None:
+        return True, []
 
-    # Svarade inte Steam vill vi hellre behålla raden än tappa ett riktigt spel.
-    return kind in (None, "game")
+    return details["type"] == "game", details["genres"]
 
 
 def fetch_page(**params) -> list[dict]:
@@ -130,7 +244,7 @@ def collect() -> list[dict]:
     return list(deals.values())
 
 
-def to_row(deal: dict) -> dict:
+def to_row(deal: dict, genres: list[str]) -> dict:
     """Översätter CheapSharks fältnamn till våra kolumnnamn."""
     steam_app_id = deal.get("steamAppID")
     store = STORES[deal["storeID"]]
@@ -161,6 +275,7 @@ def to_row(deal: dict) -> dict:
         "thumb": deal.get("thumb"),
         "steam_app_id": steam_app_id,
         "claim_url": claim_url,
+        "genres": genres,
     }
 
 
@@ -169,11 +284,11 @@ def to_row(deal: dict) -> dict:
 UPSERT = text("""
     INSERT INTO offers (
         deal_id, title, store, normal_price, sale_price,
-        savings, is_free, thumb, steam_app_id, claim_url, fetched_at
+        savings, is_free, thumb, steam_app_id, claim_url, genres, fetched_at
     )
     VALUES (
         :deal_id, :title, :store, :normal_price, :sale_price,
-        :savings, :is_free, :thumb, :steam_app_id, :claim_url, now()
+        :savings, :is_free, :thumb, :steam_app_id, :claim_url, :genres, now()
     )
     ON CONFLICT (deal_id) DO UPDATE SET
         title        = EXCLUDED.title,
@@ -185,6 +300,10 @@ UPSERT = text("""
         thumb        = EXCLUDED.thumb,
         steam_app_id = EXCLUDED.steam_app_id,
         claim_url    = EXCLUDED.claim_url,
+        -- Ett spels genrer ändras inte. Misslyckades uppslaget den här gången
+        -- (Steam eller GOG svarade inte) behåller vi de genrer vi redan har.
+        genres       = CASE WHEN EXCLUDED.genres = '{}' THEN offers.genres
+                            ELSE EXCLUDED.genres END,
         fetched_at   = now()
 """)
 
@@ -219,10 +338,14 @@ def main() -> None:
     print(f"  {len(deals)} erbjudanden hämtade")
 
     print("Sorterar bort tillägg, utgåvor och paket…")
-    games = [deal for deal in deals if is_game(deal)]
-    print(f"  {len(deals) - len(games)} bortsorterade, {len(games)} spel kvar")
+    rows = []
+    for deal in deals:
+        keep, genres = classify(deal)
+        if keep:
+            rows.append(to_row(deal, genres))
+    print(f"  {len(deals) - len(rows)} bortsorterade, {len(rows)} spel kvar")
+    print(f"  {sum(1 for row in rows if row['genres'])} av dem har genre (från Steam eller GOG)")
 
-    rows = [to_row(deal) for deal in games]
     save(rows)
 
     stale = remove_stale([row["deal_id"] for row in rows])

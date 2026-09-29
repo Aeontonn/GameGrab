@@ -16,7 +16,11 @@ export async function fetchOffers(): Promise<Offer[]> {
     throw new Error(`Backend svarade ${response.status}`)
   }
 
-  return response.json()
+  const offers: Offer[] = await response.json()
+
+  // En äldre backend skickar inga genrer. Då behandlar vi dem som tomma i
+  // stället för att låta sidan krascha när någon filtrerar på genre.
+  return offers.map((offer) => ({ ...offer, genres: offer.genres ?? [] }))
 }
 
 export type Health =

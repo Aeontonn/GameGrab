@@ -51,6 +51,11 @@ aside h2 {
   margin: 0 0 8px;
 }
 
+/* Luft mellan filtergrupperna, till exempel före "Genre". */
+.filter-option + h2 {
+  margin-top: 20px;
+}
+
 .filter-option {
   display: block;
   padding: 4px 0;
@@ -114,6 +119,13 @@ aside button:disabled {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-faint);
+}
+
+/* Genrerna på kortet: stödinformation, lika dämpad som priset. */
+.genres {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-dim);
 }
 
 .price {

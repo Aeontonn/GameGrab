@@ -72,7 +72,7 @@ def offers():
             rows = connection.execute(
                 text("""
                     SELECT id, title, store, normal_price, sale_price, savings,
-                           is_free, thumb, steam_app_id, claim_url, fetched_at
+                           is_free, thumb, steam_app_id, claim_url, genres, fetched_at
                     FROM offers
                     WHERE fetched_at > now() - (:stale_after_hours * interval '1 hour')
                       AND (is_free OR savings >= :min_savings)
