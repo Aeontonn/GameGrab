@@ -130,10 +130,14 @@ function App() {
   // Bygger på de filtrerade erbjudandena, så att butik och genre gäller här
   // också. Spelen finns kvar i huvudlistan – sektionen är en genväg, inte
   // en egen hög. Erbjudanden utan känt slutdatum kan inte hamna här.
+  //
+  // Gränsen följer det kortet visar: allt som står som "7 dagar kvar" eller
+  // mindre ska med. Kortet avrundar nedåt, så 7 dagar och 8 timmar visas som
+  // "7 dagar kvar" – därför går gränsen vid 8 hela dygn, inte 7.
   const endingSoon = useMemo(() => {
-    const limit = openedAt + ENDING_SOON_DAYS * 24 * 3_600_000
+    const limit = openedAt + (ENDING_SOON_DAYS + 1) * 24 * 3_600_000
     return visible
-      .filter((offer) => offer.ends_at && new Date(offer.ends_at).getTime() <= limit)
+      .filter((offer) => offer.ends_at && new Date(offer.ends_at).getTime() < limit)
       .sort((a, b) => new Date(a.ends_at!).getTime() - new Date(b.ends_at!).getTime())
   }, [visible, openedAt])
 
