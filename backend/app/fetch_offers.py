@@ -1,6 +1,6 @@
 """Hämtar gratis- och rabatterbjudanden från CheapShark och sparar dem i databasen.
 
-Körs automatiskt var 3:e timme av .github/workflows/fetch-offers.yml.
+Körs automatiskt varje timme av .github/workflows/fetch-offers.yml.
 
 Kan också köras manuellt, t.ex. för att testa en ändring:
 
@@ -9,8 +9,10 @@ Kan också köras manuellt, t.ex. för att testa en ändring:
     python -m app.fetch_offers
 """
 
+from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 import re
 from dotenv import load_dotenv
@@ -139,14 +141,16 @@ def normalize_title(title: str) -> str:
     return re.sub(r"[^a-z0-9]", "", title.lower())
 
 
-def gog_details(title: str) -> dict | None:
-    """Reserv för spel utan Steam-id: letar upp titeln i GOG:s katalog.
+@lru_cache(maxsize=None)
+def gog_find(title: str) -> dict | None:
+    """Letar upp titeln i GOG:s katalog och returnerar GOG:s egen post för spelet.
 
     Bara exakt samma titel räknas. En lösare sökning hittar lätt fel spel,
     som Fallout 76 när vi letar efter Fallout.
 
     Returnerar None om GOG inte hittar spelet eller inte svarar – katalogen
-    är inte officiellt dokumenterad och svarar ibland med fel.
+    är inte officiellt dokumenterad och svarar ibland med fel. Svaret cachas,
+    så genre- och slutdatumsuppslagen för samma spel bara kostar ett anrop.
     """
     params = urlencode({"query": f"like:{title}", "limit": 10})
     request = Request(f"{GOG_CATALOG}?{params}", headers={"User-Agent": USER_AGENT})
@@ -166,7 +170,12 @@ def gog_details(title: str) -> dict | None:
         return None
 
     wanted = normalize_title(title)
-    match = next((p for p in products if normalize_title(p["title"]) == wanted), None)
+    return next((p for p in products if normalize_title(p["title"]) == wanted), None)
+
+
+def gog_details(title: str) -> dict | None:
+    """Reserv för spel utan Steam-id: slår upp genre och typ i GOG:s katalog."""
+    match = gog_find(title)
     if match is None:
         return None
 
@@ -208,6 +217,134 @@ def classify(deal: dict) -> tuple[bool, list[str]]:
         return True, []
 
     return details["type"] == "game", details["genres"]
+
+
+# Vi visar bara gratisspel och erbjudanden med minst så här stor rabatt (samma
+# gräns som MIN_SAVINGS_PERCENT i main.py). Slutdatum slår vi bara upp för dem.
+MIN_SHOWN_SAVINGS = 80
+
+
+def steam_end_dates(app_ids: list[str]) -> dict[str, datetime]:
+    """Frågar Steam när rean tar slut, för många spel i taget.
+
+    Returnerar {steam-id: slutdatum}. Spel utan pågående rea, eller utan
+    känt slutdatum, saknas i svaret.
+    """
+    found: dict[str, datetime] = {}
+
+    for start in range(0, len(app_ids), 100):
+        batch = app_ids[start : start + 100]
+        query = json.dumps(
+            {
+                "ids": [{"appid": int(app_id)} for app_id in batch],
+                "context": {"language": "english", "country_code": "US"},
+                "data_request": {},
+            }
+        )
+        url = (
+            "https://api.steampowered.com/IStoreBrowseService/GetItems/v1"
+            f"?input_json={quote(query)}"
+        )
+
+        try:
+            with urlopen(Request(url, headers={"User-Agent": USER_AGENT}), timeout=30) as response:
+                items = json.load(response)["response"].get("store_items", [])
+        except Exception:
+            continue
+
+        for item in items:
+            option = item.get("best_purchase_option") or {}
+            for discount in option.get("active_discounts") or []:
+                if discount.get("discount_end_date"):
+                    found[str(item["appid"])] = datetime.fromtimestamp(
+                        discount["discount_end_date"], tz=timezone.utc
+                    )
+
+    return found
+
+
+def epic_end_dates() -> dict[str, datetime]:
+    """Hämtar Epics egen lista över pågående kampanjer, med slutdatum.
+
+    Returnerar {normaliserad titel: slutdatum}. CheapShark ger inget Epic-id,
+    så spelen måste matchas på titel.
+    """
+    url = (
+        "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions"
+        "?locale=en-US&country=US&allowCountries=US"
+    )
+
+    try:
+        with urlopen(Request(url, headers={"User-Agent": USER_AGENT}), timeout=30) as response:
+            elements = json.load(response)["data"]["Catalog"]["searchStore"]["elements"]
+    except Exception:
+        return {}
+
+    found: dict[str, datetime] = {}
+    for element in elements:
+        # promotionalOffers är det som gäller nu. Kommande kampanjer ligger
+        # i ett eget fält och ska inte förväxlas med dem.
+        for group in (element.get("promotions") or {}).get("promotionalOffers", []):
+            for offer in group["promotionalOffers"]:
+                found[normalize_title(element["title"])] = datetime.fromisoformat(
+                    offer["endDate"].replace("Z", "+00:00")
+                )
+
+    return found
+
+
+# GOG:s produktsida har slutdatumet inbäddat som JavaScript, t.ex.
+# cardProductPromoEndDate = {"date":"2026-10-07 09:59:59.000000","timezone_type":1,"timezone":"+03:00"}
+GOG_PROMO_END = re.compile(r"cardProductPromoEndDate\s*=\s*(\{.*?\})")
+
+
+def gog_end_date(title: str) -> datetime | None:
+    """Läser slutdatumet från spelets sida hos GOG.
+
+    GOG har inget API för det – katalogen saknar fältet – så vi läser sidan.
+    Det är inte dokumenterat och kan sluta fungera om GOG bygger om sidan;
+    då blir svaret None och erbjudandet visas utan nedräkning.
+    """
+    match = gog_find(title)
+    if match is None:
+        return None
+
+    request = Request(
+        f"https://www.gog.com/en/game/{match['slug']}",
+        headers={"User-Agent": "Mozilla/5.0 (compatible; GameGrab/0.1; student project)"},
+    )
+
+    try:
+        with urlopen(request, timeout=30) as response:
+            html = response.read().decode("utf-8", errors="replace")
+        promo = json.loads(GOG_PROMO_END.search(html).group(1))
+        # timezone_type 1 betyder att tidszonen är en fast offset som "+03:00".
+        # Andra typer har vi inte sett, och gissar hellre inte om.
+        if promo["timezone_type"] != 1:
+            return None
+        return datetime.fromisoformat(promo["date"][:19] + promo["timezone"])
+    except Exception:
+        return None
+
+
+def add_end_dates(rows: list[dict]) -> None:
+    """Fyller i ends_at på raderna, från den butik som erbjudandet gäller.
+
+    Sätter None när butiken inte uppger något slutdatum. Steam kollas bara
+    för Steam-rader: ett spel kan vara på rea på GOG utan att vara det på Steam.
+    """
+    steam = steam_end_dates(
+        [row["steam_app_id"] for row in rows if row["store"] == "Steam" and row["steam_app_id"]]
+    )
+    epic = epic_end_dates()
+
+    for row in rows:
+        if row["store"] == "Steam":
+            row["ends_at"] = steam.get(row["steam_app_id"])
+        elif row["store"] == "Epic Games":
+            row["ends_at"] = epic.get(normalize_title(row["title"]))
+        elif row["is_free"] or row["savings"] >= MIN_SHOWN_SAVINGS:
+            row["ends_at"] = gog_end_date(row["title"])
 
 
 def fetch_page(**params) -> list[dict]:
@@ -276,6 +413,8 @@ def to_row(deal: dict, genres: list[str]) -> dict:
         "steam_app_id": steam_app_id,
         "claim_url": claim_url,
         "genres": genres,
+        # Fylls i av add_end_dates. None betyder att slutdatumet är okänt.
+        "ends_at": None,
     }
 
 
@@ -284,11 +423,11 @@ def to_row(deal: dict, genres: list[str]) -> dict:
 UPSERT = text("""
     INSERT INTO offers (
         deal_id, title, store, normal_price, sale_price,
-        savings, is_free, thumb, steam_app_id, claim_url, genres, fetched_at
+        savings, is_free, thumb, steam_app_id, claim_url, genres, ends_at, fetched_at
     )
     VALUES (
         :deal_id, :title, :store, :normal_price, :sale_price,
-        :savings, :is_free, :thumb, :steam_app_id, :claim_url, :genres, now()
+        :savings, :is_free, :thumb, :steam_app_id, :claim_url, :genres, :ends_at, now()
     )
     ON CONFLICT (deal_id) DO UPDATE SET
         title        = EXCLUDED.title,
@@ -304,6 +443,9 @@ UPSERT = text("""
         -- (Steam eller GOG svarade inte) behåller vi de genrer vi redan har.
         genres       = CASE WHEN EXCLUDED.genres = '{}' THEN offers.genres
                             ELSE EXCLUDED.genres END,
+        -- Samma sak för slutdatumet: misslyckas uppslaget behåller vi det vi har.
+        -- Ett datum som hunnit passera döljs ändå av /offers.
+        ends_at      = COALESCE(EXCLUDED.ends_at, offers.ends_at),
         fetched_at   = now()
 """)
 
@@ -345,6 +487,10 @@ def main() -> None:
             rows.append(to_row(deal, genres))
     print(f"  {len(deals) - len(rows)} bortsorterade, {len(rows)} spel kvar")
     print(f"  {sum(1 for row in rows if row['genres'])} av dem har genre (från Steam eller GOG)")
+
+    print("Hämtar slutdatum…")
+    add_end_dates(rows)
+    print(f"  {sum(1 for row in rows if row['ends_at'])} av {len(rows)} har slutdatum")
 
     save(rows)
 

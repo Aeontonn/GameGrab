@@ -144,6 +144,15 @@ aside button:disabled {
   font-weight: 700;
 }
 
+/* Hur länge erbjudandet gäller. Full styrka, eftersom det är det som gör
+   att man klickar nu i stället för sen. */
+.time-left {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
 /* Länken är sidans viktigaste klick, så den får full styrka. */
 .offers a {
   color: var(--text);
