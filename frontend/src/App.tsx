@@ -14,6 +14,7 @@ function App() {
 
   // Vilka butiker som är förkryssade. Tom lista betyder "visa alla".
   const [stores, setStores] = useState<string[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
 
   // Körs en gång när sidan laddas: hämta erbjudandena från backend.
   useEffect(() => {
@@ -23,11 +24,19 @@ function App() {
   }, [])
 
   // Filtrerar om bara när listan eller kryssrutorna faktiskt ändrats.
-  const visible = useMemo(() => {
-    if (load.state !== 'ok') return []
-    if (stores.length === 0) return load.offers
-    return load.offers.filter((offer) => stores.includes(offer.store))
-  }, [load, stores])
+ const visible = useMemo(() => {
+  if (load.state !== 'ok') return []
+
+  return load.offers.filter((offer) => {
+    const matchesStore =
+      stores.length === 0 || stores.includes(offer.store)
+
+    const matchesSearch =
+      offer.title.toLowerCase().includes(searchTerm.toLowerCase())
+
+    return matchesStore && matchesSearch
+  })
+}, [load, stores, searchTerm])
 
   // Kryssar i butiken om den är omarkerad, kryssar ur om den redan är vald.
   const toggleStore = (store: string) =>
@@ -76,6 +85,21 @@ function App() {
         </aside>
 
         <main>
+          <div className="search-bar">
+            <span className="search-icon">⌕</span>
+
+            <input
+              type="search"
+              placeholder="Sök efter spel..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+
+            <button className="search-action" type="button">
+              Filter
+            </button>
+          </div>
+
           <p className="count">
             <strong>{visible.length}</strong> erbjudanden
           </p>
