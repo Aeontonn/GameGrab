@@ -167,7 +167,7 @@ aside button:disabled {
 
   width: 100%;
   max-width: 460px;
-  margin: 8px 0 24px 0;
+  margin: 80px 0 24px -0.5px;
 
   padding: 8px 14px;
 
@@ -175,6 +175,8 @@ aside button:disabled {
   background: rgba(93, 120, 138, 0.35);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(180, 200, 210, 0.35);
+
+  transform: translateY(12px);
 }
 
 .search-icon {
