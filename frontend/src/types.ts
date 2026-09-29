@@ -20,6 +20,9 @@ export type Offer = {
   // Dit knappen leder: butikssidan där spelet hämtas.
   claim_url: string
 
+  // Spelets genrer enligt Steam, på engelska. Tom lista om Steam inte känner till spelet.
+  genres: string[]
+
   // När raden senast hämtades från CheapShark.
   fetched_at: string
 }
