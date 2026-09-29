@@ -118,6 +118,14 @@ function App() {
           <ul className="offers">
             {visible.map((offer) => (
               <li key={offer.id}>
+                {offer.thumb && (
+                  <img
+                    className="game-image"
+                    src={offer.thumb}
+                    alt={offer.title}
+                  />
+                )}
+                
                 <span className="store">{offer.store}</span>
 
                 <h3>{offer.title}</h3>
