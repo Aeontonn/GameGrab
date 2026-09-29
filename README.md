@@ -203,13 +203,26 @@ Backend behöver `DATABASE_URL` som miljövariabel på Render för att kunna ans
 
 ## Uppdatering av erbjudanden
 
-`backend/app/fetch_offers.py` hämtar erbjudanden från CheapShark och sparar dem i databasen. Skriptet körs automatiskt var 3:e timme av GitHub Actions-jobbet `.github/workflows/fetch-offers.yml` (kan också startas manuellt därifrån).
+`backend/app/fetch_offers.py` hämtar erbjudanden från CheapShark och sparar dem i databasen. Skriptet körs automatiskt varje timme av GitHub Actions-jobbet `.github/workflows/fetch-offers.yml` (kan också startas manuellt därifrån).
 
 För att jobbet ska kunna nå databasen behöver repots hemlighet `DATABASE_URL` finnas under **Settings → Secrets and variables → Actions** i GitHub och peka på samma databas som backend använder.
 
-`/offers`-endpointen döljer erbjudanden som är äldre än `STALE_AFTER_HOURS` timmar (standard 6, dubbelt så långt som hämtningsintervallet) så att ett missat schemalagt jobb inte visar erbjudanden som kan ha gått ut hos butiken.
+`/offers`-endpointen döljer erbjudanden som är äldre än `STALE_AFTER_HOURS` timmar (standard 6) så att ett missat schemalagt jobb inte visar erbjudanden som kan ha gått ut hos butiken.
 
 Den visar dessutom bara gratisspel och erbjudanden med minst `MIN_SAVINGS_PERCENT` procent rabatt (standard 80). Mindre rabatter sparas i databasen men lämnas inte ut.
+
+## Populära gratisspel
+
+Spel som alltid är gratis (free to play) hanteras separat från erbjudandena, eftersom CheapShark inte listar dem. `backend/app/fetch_free_games.py` söker på Steam efter free to play-spel, bekräftar varje kandidat med Steams `appdetails` (riktigt spel och `is_free`) och sparar de 150 populäraste i tabellen `free_games`. Jobbet `.github/workflows/fetch-free-games.yml` kör det en gång per dygn och kan även startas manuellt.
+
+Listan lämnas ut av `GET /free-games`, populärast först. Den har ingen färskhetskoll som `/offers`, eftersom ett free to play-spel inte slutar vara gratis över en natt. Frontend visar den som en mindre sektion, "Populära gratisspel", under erbjudandena. Genrefiltret gäller båda sektionerna, butiksfiltret bara erbjudandena.
+
+Tabellen skapas av `backend/schema.sql`, som kan köras om utan att skriva över data. Manuell körning:
+
+```bash
+cd backend
+python -m app.fetch_free_games
+```
 
 ## CORS
 

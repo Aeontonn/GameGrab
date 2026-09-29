@@ -1,0 +1,37 @@
+# Håller listan över alltid gratis spel (free to play) färsk.
+# Körs en gång per dygn, och kan även startas manuellt från GitHub-fliken Actions.
+#
+# DATABASE_URL måste finnas som ett repo-secret, på samma sätt som för
+# fetch-offers.yml.
+
+name: Hämta free to play-spel
+
+on:
+  schedule:
+    - cron: "30 4 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  fetch:
+    name: Kör fetch_free_games.py
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - name: Hämta och spara spel
+        run: python -m app.fetch_free_games
