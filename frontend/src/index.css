@@ -83,6 +83,11 @@ aside button:disabled {
   cursor: default;
 }
 
+/* "Tid kvar" står för sig under "Visa alla", med luft ovanför. */
+.time-filter {
+  margin-top: 32px;
+}
+
 .count {
   margin: 0 0 16px;
   color: var(--text-dim);
@@ -187,18 +192,6 @@ main > h2 {
 }
 
 /* Mindre sektion under erbjudandena: kompakta rader i stället för kort. */
-/* "Slutar snart" ligger överst och avgränsas från huvudlistan under. */
-.ending-soon {
-  margin-bottom: 40px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--line);
-}
-
-.ending-soon h2 {
-  font-size: 18px;
-  margin: 0 0 4px;
-}
-
 .always-free {
   margin-top: 40px;
   padding-top: 24px;
