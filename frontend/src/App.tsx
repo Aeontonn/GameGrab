@@ -7,6 +7,59 @@ import type { FreeGame, Offer } from './types'
 const toggle = (list: string[], value: string) =>
   list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 
+// Texten som visar hur länge erbjudandet gäller, eller null om butiken inte
+// uppger något slutdatum. Räknar hela dygn framåt, så "2 dagar kvar" betyder
+// att det finns minst 2 dygn kvar – och sista dygnet säger vi timmar, för
+// "0 dagar kvar" låter som att det redan är slut.
+const timeLeft = (endsAt: string | null): string | null => {
+  if (!endsAt) return null
+
+  const msLeft = new Date(endsAt).getTime() - Date.now()
+  if (msLeft <= 0) return 'Slutar snart'
+
+  const hours = Math.floor(msLeft / 3_600_000)
+  if (hours < 24) return hours <= 1 ? 'Mindre än 1 timme kvar' : `${hours} timmar kvar`
+
+  const days = Math.floor(hours / 24)
+  return days === 1 ? '1 dag kvar' : `${days} dagar kvar`
+}
+
+// "Slutar snart" visar erbjudanden som går ut inom så här många dagar.
+const ENDING_SOON_DAYS = 7
+
+// Ett erbjudande som kort. Används både i "Slutar snart" och i huvudlistan.
+function OfferCard({ offer }: { offer: Offer }) {
+  const left = timeLeft(offer.ends_at)
+
+  return (
+    <li>
+      <span className="store">{offer.store}</span>
+
+      <h3>{offer.title}</h3>
+
+      {offer.genres.length > 0 && <p className="genres">{offer.genres.join(' · ')}</p>}
+
+      <p className="price">
+        {offer.is_free ? (
+          <strong>Gratis just nu</strong>
+        ) : (
+          <>
+            <s>${offer.normal_price.toFixed(2)}</s> ${offer.sale_price.toFixed(2)}
+          </>
+        )}{' '}
+        <span className="savings">−{Math.round(offer.savings)}%</span>
+      </p>
+
+      {left && <p className="time-left">{left}</p>}
+
+      {/* Lämnar sidan, så vi öppnar i ny flik. */}
+      <a href={offer.claim_url} target="_blank" rel="noopener noreferrer">
+        Hämta på {offer.store} →
+      </a>
+    </li>
+  )
+}
+
 // De lägen sidan kan vara i medan den hämtar erbjudanden.
 type Load =
   | { state: 'loading' }
@@ -22,6 +75,9 @@ type FreeLoad =
 function App() {
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [freeLoad, setFreeLoad] = useState<FreeLoad>({ state: 'loading' })
+
+  // Tiden när sidan öppnades. Avgör vad som räknas som "slutar snart".
+  const [openedAt] = useState(() => Date.now())
 
   // Vilka butiker som är förkryssade. Tom lista betyder "visa alla".
   const [stores, setStores] = useState<string[]>([])
@@ -69,6 +125,17 @@ function App() {
         (genres.length === 0 || offer.genres.some((genre) => genres.includes(genre))),
     )
   }, [load, stores, genres])
+
+  // Erbjudanden som går ut inom en vecka, det som slutar först överst.
+  // Bygger på de filtrerade erbjudandena, så att butik och genre gäller här
+  // också. Spelen finns kvar i huvudlistan – sektionen är en genväg, inte
+  // en egen hög. Erbjudanden utan känt slutdatum kan inte hamna här.
+  const endingSoon = useMemo(() => {
+    const limit = openedAt + ENDING_SOON_DAYS * 24 * 3_600_000
+    return visible
+      .filter((offer) => offer.ends_at && new Date(offer.ends_at).getTime() <= limit)
+      .sort((a, b) => new Date(a.ends_at!).getTime() - new Date(b.ends_at!).getTime())
+  }, [visible, openedAt])
 
   // Genrefiltret gäller även "Alltid gratis". Butiksfiltret gör det inte,
   // eftersom de spelen nästan alla ligger på Steam.
@@ -142,6 +209,23 @@ function App() {
         </aside>
 
         <main>
+          {/* Döljs helt när inget slutar inom en vecka, i stället för att
+              visa en tom rubrik. */}
+          {endingSoon.length > 0 && (
+            <section className="ending-soon">
+              <h2>Slutar snart</h2>
+              <p className="count">
+                <strong>{endingSoon.length}</strong> erbjudanden går ut inom {ENDING_SOON_DAYS} dagar
+              </p>
+
+              <ul className="offers">
+                {endingSoon.map((offer) => (
+                  <OfferCard key={offer.id} offer={offer} />
+                ))}
+              </ul>
+            </section>
+          )}
+
           <h2>Gratis och på rea</h2>
           <p className="count">
             <strong>{visible.length}</strong> erbjudanden
@@ -149,29 +233,7 @@ function App() {
 
           <ul className="offers">
             {visible.map((offer) => (
-              <li key={offer.id}>
-                <span className="store">{offer.store}</span>
-
-                <h3>{offer.title}</h3>
-
-                {offer.genres.length > 0 && <p className="genres">{offer.genres.join(' · ')}</p>}
-
-                <p className="price">
-                  {offer.is_free ? (
-                    <strong>Gratis just nu</strong>
-                  ) : (
-                    <>
-                      <s>${offer.normal_price.toFixed(2)}</s> ${offer.sale_price.toFixed(2)}
-                    </>
-                  )}{' '}
-                  <span className="savings">−{Math.round(offer.savings)}%</span>
-                </p>
-
-                {/* Lämnar sidan, så vi öppnar i ny flik. */}
-                <a href={offer.claim_url} target="_blank" rel="noopener noreferrer">
-                  Hämta på {offer.store} →
-                </a>
-              </li>
+              <OfferCard key={offer.id} offer={offer} />
             ))}
           </ul>
 

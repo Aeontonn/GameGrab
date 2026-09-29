@@ -63,7 +63,7 @@ def health():
     return {"status": "ok", "database": "connected"}
 
 
-# Erbjudandena frontend ritar upp: färska, och antingen gratis eller minst 80 procent rabatt.
+# Erbjudandena frontend ritar upp: färska, inte utgångna, och antingen gratis eller minst 80 procent rabatt.
 # Gratis först, därefter största rabatten – det mest lockande överst.
 @app.get("/offers")
 def offers():
@@ -72,10 +72,11 @@ def offers():
             rows = connection.execute(
                 text("""
                     SELECT id, title, store, normal_price, sale_price, savings,
-                           is_free, thumb, steam_app_id, claim_url, genres, fetched_at
+                           is_free, thumb, steam_app_id, claim_url, genres, ends_at, fetched_at
                     FROM offers
                     WHERE fetched_at > now() - (:stale_after_hours * interval '1 hour')
                       AND (is_free OR savings >= :min_savings)
+                      AND (ends_at IS NULL OR ends_at > now())
                     ORDER BY is_free DESC, savings DESC
                 """),
                 {
@@ -105,6 +106,8 @@ def offers():
             "sale_price": float(row["sale_price"]),
             "savings": float(row["savings"]),
             "fetched_at": row["fetched_at"].isoformat(),
+            # None när butiken inte uppger något slutdatum.
+            "ends_at": row["ends_at"].isoformat() if row["ends_at"] else None,
         }
         for row in rows
     ]
