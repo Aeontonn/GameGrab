@@ -50,3 +50,18 @@ ALTER TABLE offers ADD COLUMN IF NOT EXISTS genres TEXT[] NOT NULL DEFAULT '{}';
 
 -- När erbjudandet går ut, enligt butiken själv. NULL om butiken inte uppger något.
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ;
+
+-- Spel som alltid är gratis (free to play), separat från tidsbegränsade
+-- erbjudanden i offers. Fylls av fetch_free_games.py.
+CREATE TABLE IF NOT EXISTS free_games (
+    id              SERIAL PRIMARY KEY,
+    steam_app_id    TEXT UNIQUE NOT NULL,
+    title           TEXT NOT NULL,
+    genres          TEXT[] NOT NULL DEFAULT '{}',
+
+    -- Plats i listan, 1 = mest spelad. Behåller Steams ordning.
+    rank            INTEGER NOT NULL,
+
+    claim_url       TEXT NOT NULL,
+    fetched_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -180,3 +180,51 @@ aside button:disabled {
 .error {
   color: var(--error);
 }
+
+main > h2 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+/* Mindre sektion under erbjudandena: kompakta rader i stället för kort. */
+.always-free {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.always-free h2 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+.free-games {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 24px;
+}
+
+.free-games li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.free-games a {
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.free-games a:hover {
+  text-decoration: underline;
+}
+
+.free-games .genres {
+  display: block;
+  margin: 2px 0 0;
+  font-size: 12px;
+}
