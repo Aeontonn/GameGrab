@@ -209,6 +209,8 @@ För att jobbet ska kunna nå databasen behöver repots hemlighet `DATABASE_URL`
 
 `/offers`-endpointen döljer erbjudanden som är äldre än `STALE_AFTER_HOURS` timmar (standard 6, dubbelt så långt som hämtningsintervallet) så att ett missat schemalagt jobb inte visar erbjudanden som kan ha gått ut hos butiken.
 
+Den visar dessutom bara gratisspel och erbjudanden med minst `MIN_SAVINGS_PERCENT` procent rabatt (standard 80). Mindre rabatter sparas i databasen men lämnas inte ut.
+
 ## CORS
 
 Under lokal utveckling tillåter backend anrop från:
