@@ -51,6 +51,11 @@ aside h2 {
   margin: 0 0 8px;
 }
 
+/* Luft mellan filtergrupperna, till exempel före "Genre". */
+.filter-option + h2 {
+  margin-top: 20px;
+}
+
 .filter-option {
   display: block;
   padding: 4px 0;
@@ -78,6 +83,11 @@ aside button:disabled {
   cursor: default;
 }
 
+/* "Tid kvar" står för sig under "Visa alla", med luft ovanför. */
+.time-filter {
+  margin-top: 32px;
+}
+
 .count {
   margin: 0 0 16px;
   color: var(--text-dim);
@@ -103,6 +113,16 @@ aside button:disabled {
   padding: 12px;
 }
 
+/* Bilden som visas högst upp på varje spelkort. */
+.game-image {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  display: block;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
 .offers h3 {
   margin: 4px 0 8px;
   font-size: 16px;
@@ -114,6 +134,13 @@ aside button:disabled {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-faint);
+}
+
+/* Genrerna på kortet: stödinformation, lika dämpad som priset. */
+.genres {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-dim);
 }
 
 .price {
@@ -130,6 +157,15 @@ aside button:disabled {
 .savings {
   color: var(--text);
   font-weight: 700;
+}
+
+/* Hur länge erbjudandet gäller. Full styrka, eftersom det är det som gör
+   att man klickar nu i stället för sen. */
+.time-left {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
 }
 
 /* Länken är sidans viktigaste klick, så den får full styrka. */
@@ -158,6 +194,54 @@ aside button:disabled {
 
 .error {
   color: var(--error);
+}
+
+main > h2 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+/* Mindre sektion under erbjudandena: kompakta rader i stället för kort. */
+.always-free {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.always-free h2 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+.free-games {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 24px;
+}
+
+.free-games li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.free-games a {
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.free-games a:hover {
+  text-decoration: underline;
+}
+
+.free-games .genres {
+  display: block;
+  margin: 2px 0 0;
+  font-size: 12px;
 }
 
 .search-bar {
