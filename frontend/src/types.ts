@@ -23,8 +23,22 @@ export type Offer = {
   // Spelets genrer enligt Steam, på engelska. Tom lista om Steam inte känner till spelet.
   genres: string[]
 
+  // När erbjudandet går ut, som ISO-tid. null när butiken inte uppger något.
+  ends_at: string | null
+
   // När raden senast hämtades från CheapShark.
   fetched_at: string
+}
+
+// Ett spel som alltid är gratis (free to play), precis som /free-games lämnar ut det.
+export type FreeGame = {
+  id: number
+  title: string
+  steam_app_id: string
+  claim_url: string
+
+  // Spelets genrer enligt Steam, på engelska. Kan vara tom.
+  genres: string[]
 }
 
 // Butikerna vi hämtar från. Används för att bygga filtret.
