@@ -243,3 +243,56 @@ main > h2 {
   margin: 2px 0 0;
   font-size: 12px;
 }
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  width: 100%;
+  max-width: 460px;
+  margin: 80px 0 24px -0.5px;
+
+  padding: 8px 14px;
+
+  border-radius: 999px;
+  background: rgba(93, 120, 138, 0.35);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(180, 200, 210, 0.35);
+
+  transform: translateY(12px);
+}
+
+.search-icon {
+  font-size: 20px;
+  color: rgba(238, 243, 244, 0.8);
+  flex-shrink: 0;
+}
+
+.search-bar input {
+  width: 100%;
+
+  border: none;
+  outline: none;
+
+  background: transparent;
+
+  font-size: 1rem;
+  color: #1f2b2d;
+}
+
+.search-bar input::placeholder {
+  color: rgba(238, 243, 244, 0.6);
+}
+
+.search-action {
+  border: 1px solid rgba(180, 200, 210, 0.35);
+  background: rgba(93, 120, 138, 0.28);
+  color: #eef3f4;
+
+  padding: 8px 14px;
+  border-radius: 6px;
+
+  font-size: 0.9rem;
+  cursor: pointer;
+}

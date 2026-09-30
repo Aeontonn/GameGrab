@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { API_URL, fetchFreeGames, fetchOffers } from './api'
 import { STORES } from './types'
 import type { FreeGame, Offer } from './types'
@@ -84,6 +84,7 @@ function App() {
 
   // Vilka butiker som är förkryssade. Tom lista betyder "visa alla".
   const [stores, setStores] = useState<string[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
 
   // Vilka genrer som är förkryssade. Tom lista betyder "visa alla".
   const [genres, setGenres] = useState<string[]>([])
@@ -122,6 +123,12 @@ function App() {
     return [...found].sort((a, b) => a.localeCompare(b, 'en'))
   }, [load, freeGames])
 
+  // Sökfältet matchar på titeln, utan hänsyn till versaler.
+  const matchesSearch = useCallback(
+    (title: string) => title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
+    [searchTerm],
+  )
+
   // Ett spel visas om det matchar någon av de valda butikerna och någon av
   // de valda genrerna. Är en grupp tom filtrerar den inte alls.
   //
@@ -136,7 +143,8 @@ function App() {
     const filtered = load.offers.filter(
       (offer) =>
         (stores.length === 0 || stores.includes(offer.store)) &&
-        (genres.length === 0 || offer.genres.some((genre) => genres.includes(genre))),
+        (genres.length === 0 || offer.genres.some((genre) => genres.includes(genre))) &&
+        matchesSearch(offer.title),
     )
     if (!endingSoonOnly) return filtered
 
@@ -144,16 +152,18 @@ function App() {
     return filtered
       .filter((offer) => offer.ends_at && new Date(offer.ends_at).getTime() < limit)
       .sort((a, b) => new Date(a.ends_at!).getTime() - new Date(b.ends_at!).getTime())
-  }, [load, stores, genres, endingSoonOnly, openedAt])
+  }, [load, stores, genres, endingSoonOnly, openedAt, matchesSearch])
 
   // Genrefiltret gäller även "Alltid gratis". Butiksfiltret gör det inte,
   // eftersom de spelen nästan alla ligger på Steam.
   const visibleFree = useMemo(
     () =>
       freeGames.filter(
-        (game) => genres.length === 0 || game.genres.some((genre) => genres.includes(genre)),
+        (game) =>
+          (genres.length === 0 || game.genres.some((genre) => genres.includes(genre))) &&
+          matchesSearch(game.title),
       ),
-    [freeGames, genres],
+    [freeGames, genres, matchesSearch],
   )
 
   const anyFilter = stores.length > 0 || genres.length > 0 || endingSoonOnly
@@ -234,6 +244,21 @@ function App() {
 
         <main>
           <h2>Gratis och på rea</h2>
+          <div className="search-bar">
+            <span className="search-icon">⌕</span>
+
+            <input
+              type="search"
+              placeholder="Sök efter spel..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+
+            <button className="search-action" type="button">
+              Filter
+            </button>
+          </div>
+
           <p className="count">
             <strong>{visible.length}</strong>{' '}
             {endingSoonOnly ? `erbjudanden slutar inom ${ENDING_SOON_DAYS} dagar` : 'erbjudanden'}
