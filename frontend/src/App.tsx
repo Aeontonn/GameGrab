@@ -34,6 +34,8 @@ function OfferCard({ offer }: { offer: Offer }) {
 
   return (
     <li>
+      {offer.thumb && <img className="game-image" src={offer.thumb} alt={offer.title} />}
+
       <span className="store">{offer.store}</span>
 
       <h3>{offer.title}</h3>
@@ -239,37 +241,7 @@ function App() {
 
           <ul className="offers">
             {visible.map((offer) => (
-              <li key={offer.id}>
-                {offer.thumb && (
-                  <img
-                    className="game-image"
-                    src={offer.thumb}
-                    alt={offer.title}
-                  />
-                )}
-                
-                <span className="store">{offer.store}</span>
-
-                <h3>{offer.title}</h3>
-
-                {offer.genres.length > 0 && <p className="genres">{offer.genres.join(' · ')}</p>}
-
-                <p className="price">
-                  {offer.is_free ? (
-                    <strong>Gratis just nu</strong>
-                  ) : (
-                    <>
-                      <s>${offer.normal_price.toFixed(2)}</s> ${offer.sale_price.toFixed(2)}
-                    </>
-                  )}{' '}
-                  <span className="savings">−{Math.round(offer.savings)}%</span>
-                </p>
-
-                {/* Lämnar sidan, så vi öppnar i ny flik. */}
-                <a href={offer.claim_url} target="_blank" rel="noopener noreferrer">
-                  Hämta på {offer.store} →
-                </a>
-              </li>
+              <OfferCard key={offer.id} offer={offer} />
             ))}
           </ul>
 
