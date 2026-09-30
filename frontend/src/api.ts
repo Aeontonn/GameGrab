@@ -1,4 +1,4 @@
-import type { Offer } from './types'
+import type { FreeGame, Offer } from './types'
 
 // Adressen till backend. Sätts som miljövariabel vid deploy, annars den lokala servern.
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -16,7 +16,29 @@ export async function fetchOffers(): Promise<Offer[]> {
     throw new Error(`Backend svarade ${response.status}`)
   }
 
-  return response.json()
+  const offers: Offer[] = await response.json()
+
+  // En äldre backend skickar inga genrer. Då behandlar vi dem som tomma i
+  // stället för att låta sidan krascha när någon filtrerar på genre.
+  // Samma sak för slutdatum: saknas fältet betyder det "okänt".
+  return offers.map((offer) => ({
+    ...offer,
+    genres: offer.genres ?? [],
+    ends_at: offer.ends_at ?? null,
+  }))
+}
+
+// Hämtar spelen som alltid är gratis. Backend sorterar dem redan med de
+// mest spelade först.
+export async function fetchFreeGames(): Promise<FreeGame[]> {
+  const response = await fetch(`${API_URL}/free-games`)
+
+  if (!response.ok) {
+    throw new Error(`Backend svarade ${response.status}`)
+  }
+
+  const games: FreeGame[] = await response.json()
+  return games.map((game) => ({ ...game, genres: game.genres ?? [] }))
 }
 
 export type Health =

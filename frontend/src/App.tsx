@@ -1,7 +1,67 @@
-import { useEffect, useMemo, useState } from 'react'
-import { API_URL, fetchOffers } from './api'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { API_URL, fetchFreeGames, fetchOffers } from './api'
 import { STORES } from './types'
-import type { Offer } from './types'
+import type { FreeGame, Offer } from './types'
+
+// Kryssar i värdet om det är omarkerat, kryssar ur det om det redan är valt.
+const toggle = (list: string[], value: string) =>
+  list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
+
+// Texten som visar hur länge erbjudandet gäller, eller null om butiken inte
+// uppger något slutdatum. Räknar hela dygn framåt, så "2 dagar kvar" betyder
+// att det finns minst 2 dygn kvar – och sista dygnet säger vi timmar, för
+// "0 dagar kvar" låter som att det redan är slut.
+const timeLeft = (endsAt: string | null): string | null => {
+  if (!endsAt) return null
+
+  const msLeft = new Date(endsAt).getTime() - Date.now()
+  if (msLeft <= 0) return 'Slutar snart'
+
+  const hours = Math.floor(msLeft / 3_600_000)
+  if (hours < 24) return hours <= 1 ? 'Mindre än 1 timme kvar' : `${hours} timmar kvar`
+
+  const days = Math.floor(hours / 24)
+  return days === 1 ? '1 dag kvar' : `${days} dagar kvar`
+}
+
+// Valet "Slutar inom 2 dagar" visar erbjudanden som går ut inom så här många dagar.
+// Med 7 dagar kom nästan alla erbjudanden med, så valet sa ingenting.
+const ENDING_SOON_DAYS = 2
+
+// Ett erbjudande som kort.
+function OfferCard({ offer }: { offer: Offer }) {
+  const left = timeLeft(offer.ends_at)
+
+  return (
+    <li>
+      {offer.thumb && <img className="game-image" src={offer.thumb} alt={offer.title} />}
+
+      <span className="store">{offer.store}</span>
+
+      <h3>{offer.title}</h3>
+
+      {offer.genres.length > 0 && <p className="genres">{offer.genres.join(' · ')}</p>}
+
+      <p className="price">
+        {offer.is_free ? (
+          <strong>Gratis just nu</strong>
+        ) : (
+          <>
+            <s>${offer.normal_price.toFixed(2)}</s> ${offer.sale_price.toFixed(2)}
+          </>
+        )}{' '}
+        <span className="savings">−{Math.round(offer.savings)}%</span>
+      </p>
+
+      {left && <p className="time-left">{left}</p>}
+
+      {/* Lämnar sidan, så vi öppnar i ny flik. */}
+      <a href={offer.claim_url} target="_blank" rel="noopener noreferrer">
+        Hämta på {offer.store} →
+      </a>
+    </li>
+  )
+}
 
 // De lägen sidan kan vara i medan den hämtar erbjudanden.
 type Load =
@@ -9,12 +69,29 @@ type Load =
   | { state: 'ok'; offers: Offer[] }
   | { state: 'error'; message: string }
 
+// "Alltid gratis" laddas för sig, så att ett fel där inte tar ner erbjudandena.
+type FreeLoad =
+  | { state: 'loading' }
+  | { state: 'ok'; games: FreeGame[] }
+  | { state: 'error' }
+
 function App() {
   const [load, setLoad] = useState<Load>({ state: 'loading' })
+  const [freeLoad, setFreeLoad] = useState<FreeLoad>({ state: 'loading' })
+
+  // Tiden när sidan öppnades. Avgör vad som räknas som "slutar snart".
+  const [openedAt] = useState(() => Date.now())
 
   // Vilka butiker som är förkryssade. Tom lista betyder "visa alla".
   const [stores, setStores] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+
+  // Vilka genrer som är förkryssade. Tom lista betyder "visa alla".
+  const [genres, setGenres] = useState<string[]>([])
+
+  // Om bara erbjudanden som slutar snart ska visas. Av från början – besökaren
+  // får aktivt välja det.
+  const [endingSoonOnly, setEndingSoonOnly] = useState(false)
 
   // Körs en gång när sidan laddas: hämta erbjudandena från backend.
   useEffect(() => {
@@ -23,26 +100,73 @@ function App() {
       .catch((error: Error) => setLoad({ state: 'error', message: error.message }))
   }, [])
 
-  // Filtrerar om bara när listan eller kryssrutorna faktiskt ändrats.
- const visible = useMemo(() => {
-  if (load.state !== 'ok') return []
+  useEffect(() => {
+    fetchFreeGames()
+      .then((games) => setFreeLoad({ state: 'ok', games }))
+      .catch(() => setFreeLoad({ state: 'error' }))
+  }, [])
 
-  return load.offers.filter((offer) => {
-    const matchesStore =
-      stores.length === 0 || stores.includes(offer.store)
+  const freeGames = useMemo(
+    () => (freeLoad.state === 'ok' ? freeLoad.games : []),
+    [freeLoad],
+  )
 
-    const matchesSearch =
-      offer.title.toLowerCase().includes(searchTerm.toLowerCase())
+  // Genrerna som faktiskt finns bland spelen, i bokstavsordning. Hämtas ur
+  // datan i stället för att skrivas in, så att filtret aldrig visar en genre
+  // som inte har några spel. Gäller båda sektionerna.
+  const allGenres = useMemo(() => {
+    const offers = load.state === 'ok' ? load.offers : []
+    const found = new Set([
+      ...offers.flatMap((offer) => offer.genres),
+      ...freeGames.flatMap((game) => game.genres),
+    ])
+    return [...found].sort((a, b) => a.localeCompare(b, 'en'))
+  }, [load, freeGames])
 
-    return matchesStore && matchesSearch
-  })
-}, [load, stores, searchTerm])
+  // Sökfältet matchar på titeln, utan hänsyn till versaler.
+  const matchesSearch = useCallback(
+    (title: string) => title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
+    [searchTerm],
+  )
 
-  // Kryssar i butiken om den är omarkerad, kryssar ur om den redan är vald.
-  const toggleStore = (store: string) =>
-    setStores((current) =>
-      current.includes(store) ? current.filter((s) => s !== store) : [...current, store],
+  // Ett spel visas om det matchar någon av de valda butikerna och någon av
+  // de valda genrerna. Är en grupp tom filtrerar den inte alls.
+  //
+  // Med "Slutar inom 2 dagar" ikryssat visas bara erbjudanden med känt
+  // slutdatum inom gränsen, och det som slutar först hamnar överst.
+  // Gränsen följer det kortet visar: allt som står som "2 dagar kvar" eller
+  // mindre ska med. Kortet avrundar nedåt, så 2 dagar och 8 timmar visas som
+  // "2 dagar kvar" – därför går gränsen vid ett dygn extra.
+  const visible = useMemo(() => {
+    if (load.state !== 'ok') return []
+
+    const filtered = load.offers.filter(
+      (offer) =>
+        (stores.length === 0 || stores.includes(offer.store)) &&
+        (genres.length === 0 || offer.genres.some((genre) => genres.includes(genre))) &&
+        matchesSearch(offer.title),
     )
+    if (!endingSoonOnly) return filtered
+
+    const limit = openedAt + (ENDING_SOON_DAYS + 1) * 24 * 3_600_000
+    return filtered
+      .filter((offer) => offer.ends_at && new Date(offer.ends_at).getTime() < limit)
+      .sort((a, b) => new Date(a.ends_at!).getTime() - new Date(b.ends_at!).getTime())
+  }, [load, stores, genres, endingSoonOnly, openedAt, matchesSearch])
+
+  // Genrefiltret gäller även "Alltid gratis". Butiksfiltret gör det inte,
+  // eftersom de spelen nästan alla ligger på Steam.
+  const visibleFree = useMemo(
+    () =>
+      freeGames.filter(
+        (game) =>
+          (genres.length === 0 || game.genres.some((genre) => genres.includes(genre))) &&
+          matchesSearch(game.title),
+      ),
+    [freeGames, genres, matchesSearch],
+  )
+
+  const anyFilter = stores.length > 0 || genres.length > 0 || endingSoonOnly
 
   if (load.state === 'loading') {
     return <p className="status">Hämtar erbjudanden…</p>
@@ -73,18 +197,53 @@ function App() {
               <input
                 type="checkbox"
                 checked={stores.includes(store)}
-                onChange={() => toggleStore(store)}
+                onChange={() => setStores((current) => toggle(current, store))}
               />
               {store}
             </label>
           ))}
 
-          <button type="button" onClick={() => setStores([])} disabled={stores.length === 0}>
+          <h2>Genre</h2>
+          {allGenres.map((genre) => (
+            <label key={genre} className="filter-option">
+              <input
+                type="checkbox"
+                checked={genres.includes(genre)}
+                onChange={() => setGenres((current) => toggle(current, genre))}
+              />
+              {genre}
+            </label>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => {
+              setStores([])
+              setGenres([])
+              setEndingSoonOnly(false)
+            }}
+            disabled={!anyFilter}
+          >
             Visa alla
           </button>
+
+          {/* Ligger under "Visa alla", avskilt från butik och genre: det är ett
+              eget val man gör aktivt, inte ett av de vanliga filtren. */}
+          <div className="time-filter">
+            <h2>Tid kvar</h2>
+            <label className="filter-option">
+              <input
+                type="checkbox"
+                checked={endingSoonOnly}
+                onChange={() => setEndingSoonOnly((current) => !current)}
+              />
+              Slutar inom {ENDING_SOON_DAYS} dagar
+            </label>
+          </div>
         </aside>
 
         <main>
+          <h2>Gratis och på rea</h2>
           <div className="search-bar">
             <span className="search-icon">⌕</span>
 
@@ -101,34 +260,44 @@ function App() {
           </div>
 
           <p className="count">
-            <strong>{visible.length}</strong> erbjudanden
+            <strong>{visible.length}</strong>{' '}
+            {endingSoonOnly ? `erbjudanden slutar inom ${ENDING_SOON_DAYS} dagar` : 'erbjudanden'}
           </p>
 
           <ul className="offers">
             {visible.map((offer) => (
-              <li key={offer.id}>
-                <span className="store">{offer.store}</span>
-
-                <h3>{offer.title}</h3>
-
-                <p className="price">
-                  {offer.is_free ? (
-                    <strong>Gratis just nu</strong>
-                  ) : (
-                    <>
-                      <s>${offer.normal_price.toFixed(2)}</s> ${offer.sale_price.toFixed(2)}
-                    </>
-                  )}{' '}
-                  <span className="savings">−{Math.round(offer.savings)}%</span>
-                </p>
-
-                {/* Lämnar sidan, så vi öppnar i ny flik. */}
-                <a href={offer.claim_url} target="_blank" rel="noopener noreferrer">
-                  Hämta på {offer.store} →
-                </a>
-              </li>
+              <OfferCard key={offer.id} offer={offer} />
             ))}
           </ul>
+
+          {freeLoad.state !== 'loading' && (
+            <section className="always-free">
+              <h2>Populära gratisspel</h2>
+
+              {freeLoad.state === 'error' ? (
+                <p className="error">Kunde inte hämta listan över gratisspel.</p>
+              ) : (
+                <>
+                  <p className="count">
+                    <strong>{visibleFree.length}</strong> free to play-spel
+                  </p>
+
+                  <ul className="free-games">
+                    {visibleFree.map((game) => (
+                      <li key={game.id}>
+                        <a href={game.claim_url} target="_blank" rel="noopener noreferrer">
+                          {game.title}
+                        </a>
+                        {game.genres.length > 0 && (
+                          <span className="genres">{game.genres.slice(0, 3).join(' · ')}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </section>
+          )}
         </main>
       </div>
     </>

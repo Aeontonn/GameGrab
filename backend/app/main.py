@@ -23,6 +23,10 @@ if not DATABASE_URL:
 # något som kanske inte längre stämmer.
 STALE_AFTER_HOURS = float(os.getenv("STALE_AFTER_HOURS", "6"))
 
+# GameGrab visar bara riktiga fynd: gratisspel och minst 80 % rabatt.
+# Mindre rabatter finns kvar i databasen men lämnas aldrig ut.
+MIN_SAVINGS_PERCENT = float(os.getenv("MIN_SAVINGS_PERCENT", "80"))
+
 # Sköter all kontakt med databasen. pool_pre_ping kollar att kopplingen lever, eftersom databaser på nätet stänger oanvända kopplingar.
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
@@ -59,7 +63,7 @@ def health():
     return {"status": "ok", "database": "connected"}
 
 
-# Alla erbjudanden vi har sparade. Det här är listan frontend ritar upp.
+# Erbjudandena frontend ritar upp: färska, inte utgångna, och antingen gratis eller minst 80 procent rabatt.
 # Gratis först, därefter största rabatten – det mest lockande överst.
 @app.get("/offers")
 def offers():
@@ -68,12 +72,17 @@ def offers():
             rows = connection.execute(
                 text("""
                     SELECT id, title, store, normal_price, sale_price, savings,
-                           is_free, thumb, steam_app_id, claim_url, fetched_at
+                           is_free, thumb, steam_app_id, claim_url, genres, ends_at, fetched_at
                     FROM offers
                     WHERE fetched_at > now() - (:stale_after_hours * interval '1 hour')
+                      AND (is_free OR savings >= :min_savings)
+                      AND (ends_at IS NULL OR ends_at > now())
                     ORDER BY is_free DESC, savings DESC
                 """),
-                {"stale_after_hours": STALE_AFTER_HOURS},
+                {
+                    "stale_after_hours": STALE_AFTER_HOURS,
+                    "min_savings": MIN_SAVINGS_PERCENT,
+                },
             ).mappings().all()
     except SQLAlchemyError as exc:
         # Samma felhantering som /health: kom vi inte fram till databasen
@@ -97,6 +106,35 @@ def offers():
             "sale_price": float(row["sale_price"]),
             "savings": float(row["savings"]),
             "fetched_at": row["fetched_at"].isoformat(),
+            # None när butiken inte uppger något slutdatum.
+            "ends_at": row["ends_at"].isoformat() if row["ends_at"] else None,
         }
         for row in rows
     ]
+
+
+# Spel som alltid är gratis (free to play), mest spelade först. Hämtas av
+# fetch_free_games.py en gång per dygn. Ingen färskhetskoll som i /offers:
+# ett free to play-spel slutar inte vara gratis över en natt.
+@app.get("/free-games")
+def free_games():
+    try:
+        with engine.connect() as connection:
+            rows = connection.execute(
+                text("""
+                    SELECT id, title, steam_app_id, claim_url, genres
+                    FROM free_games
+                    ORDER BY rank
+                """)
+            ).mappings().all()
+    except SQLAlchemyError as exc:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "database": "disconnected",
+                "detail": str(exc.__cause__ or exc),
+            },
+        )
+
+    return [dict(row) for row in rows]
