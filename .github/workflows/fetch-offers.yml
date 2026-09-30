@@ -1,12 +1,12 @@
-# Håller erbjudandena i databasen färska.
-# Körs automatiskt var 3:e timme, och kan även startas manuellt från
-# GitHub-fliken Actions.
+# Keeps the offers in the database fresh.
+# Runs automatically every 3 hours, and can also be started manually from
+# the Actions tab on GitHub.
 #
-# DATABASE_URL måste finnas som ett repo-secret (Settings → Secrets and
-# variables → Actions) och peka på samma Supabase-databas som backend
-# använder på Render.
+# DATABASE_URL must exist as a repo secret (Settings → Secrets and
+# variables → Actions) and point to the same Supabase database the backend
+# uses on Render.
 
-name: Hämta erbjudanden
+name: Fetch offers
 
 on:
   schedule:
@@ -15,7 +15,7 @@ on:
 
 jobs:
   fetch:
-    name: Kör fetch_offers.py
+    name: Run fetch_offers.py
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -35,5 +35,5 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Hämta och spara erbjudanden
+      - name: Fetch and save offers
         run: python -m app.fetch_offers

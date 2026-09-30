@@ -1,20 +1,20 @@
 # GameGrab
 
-GameGrab är ett projekt som vi arbetar på inom kursen Agil utveckling.
+GameGrab is a project we are working on in the course Agile Development.
 
-Målet är att skapa en webbplats som samlar information om gratis spel och
-tidsbegränsade gratiserbjudanden från olika spelplattformar på ett och samma ställe.
+The goal is to build a website that gathers information about free games and
+time-limited free offers from different gaming platforms in one place.
 
 ## MVP
 
-Den första versionen av GameGrab ska göra det möjligt att:
+The first version of GameGrab should make it possible to:
 
-- Se aktuella gratiserbjudanden på spel
-- Se grundläggande information om spelen
-- Se vilken plattform erbjudandet finns på
-- Se hur länge erbjudandet gäller
-- Gå vidare till plattformen där spelet kan hämtas
-- Filtrera mellan olika plattformar
+- See current free offers on games
+- See basic information about the games
+- See which platform the offer is on
+- See how long the offer lasts
+- Go to the platform where the game can be claimed
+- Filter between different platforms
 
 ## Tech stack
 
@@ -28,83 +28,83 @@ Den första versionen av GameGrab ska göra det möjligt att:
 - FastAPI
 - SQLAlchemy
 
-**Databas**
+**Database**
 - PostgreSQL via Supabase
 
 **Deployment**
 - Frontend: Vercel
 - Backend: Render
-- Databas: Supabase
+- Database: Supabase
 
-**Versionshantering**
-- Git och GitHub
+**Version control**
+- Git and GitHub
 
-## Projektstruktur
+## Project structure
 
 GameGrab/
-├── Skol_filer/    # Kursrelaterad dokumentation
-├── backend/       # FastAPI och kontakt med databasen
-├── frontend/      # React-applikationen
+├── Skol_filer/    # Course-related documentation
+├── backend/       # FastAPI and database access
+├── frontend/      # The React application
 └── README.md
 
-## Lokal utveckling
+## Local development
 
 ### Backend
 
-Gå till backend:
+Go to the backend:
 
 ```bash
 cd backend
 
 ```
 
-Skapa en virtuell Python-miljö:
+Create a Python virtual environment:
 
 ```bash
 python -m venv .venv
 ```
 
-Aktivera den virtuella miljön.
+Activate the virtual environment.
 
-På Windows:
+On Windows:
 
 ```bash
 .venv\Scripts\activate
 ```
 
-Installera backendens dependencies:
+Install the backend dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Miljövariabler
+### Environment variables
 
-Backend behöver en anslutning till PostgreSQL-databasen i Supabase.
+The backend needs a connection to the PostgreSQL database in Supabase.
 
-Skapa filen `.env` i `backend/` och använd `.env.example` som mall:
+Create the file `.env` in `backend/` and use `.env.example` as a template:
 
 ```env
 DATABASE_URL=
 ```
 
-Lägg in databasens connection string efter `DATABASE_URL=`.
+Put the database connection string after `DATABASE_URL=`.
 
-`.env` innehåller känslig information och ska inte laddas upp till GitHub.
+`.env` contains sensitive information and must not be pushed to GitHub.
 
-Starta backend:
+Start the backend:
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-Backend körs då lokalt på:
+The backend then runs locally on:
 
 ```text
 http://localhost:8000
 ```
 
-FastAPI:s automatiska API-dokumentation finns på:
+FastAPI's automatic API documentation is available at:
 
 ```text
 http://localhost:8000/docs
@@ -112,43 +112,43 @@ http://localhost:8000/docs
 
 ### Frontend
 
-Öppna en ny terminal och gå till frontend-mappen:
+Open a new terminal and go to the frontend folder:
 
 ```bash
 cd frontend
 ```
 
-Installera dependencies:
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-Starta frontend:
+Start the frontend:
 
 ```bash
 npm run dev
 ```
 
-Frontend körs normalt på:
+The frontend normally runs on:
 
 ```text
 http://localhost:5173
 ```
 
-## Kommunikation mellan frontend och backend
+## Communication between frontend and backend
 
-Frontend kommunicerar med FastAPI-backenden genom API-anrop.
+The frontend communicates with the FastAPI backend through API requests.
 
-Backend har för närvarande endpointen:
+The backend currently has the endpoint:
 
 ```text
 GET /health
 ```
 
-Den används för att kontrollera att FastAPI-servern fungerar och att den kan ansluta till PostgreSQL-databasen.
+It is used to check that the FastAPI server works and that it can connect to the PostgreSQL database.
 
-Om både backend och databas fungerar returneras:
+If both the backend and the database work, it returns:
 
 ```json
 {
@@ -157,31 +157,31 @@ Om både backend och databas fungerar returneras:
 }
 ```
 
-Frontend anropar `/health` när sidan laddas och visar om anslutningen fungerar.
+The frontend calls `/health` when the page loads and shows whether the connection works.
 
-Frontend kan visa tre olika lägen:
+The frontend can show three different states:
 
-- Kontrollerar anslutningen
-- Ansluten till backend och databas
-- Anslutningsfel
+- Checking the connection
+- Connected to backend and database
+- Connection error
 
-Backend-adressen bestäms genom miljövariabeln:
+The backend address is set through the environment variable:
 
 ```text
 VITE_API_URL
 ```
 
-Om ingen adress har angetts används den lokala backend-servern:
+If no address has been set, the local backend server is used:
 
 ```text
 http://localhost:8000
 ```
 
-Det gör att samma frontendkod kan användas både lokalt och när projektet senare deployas.
+This lets the same frontend code be used both locally and when the project is deployed later.
 
 ## Deployment
 
-Projektet kommer att använda följande struktur:
+The project will use the following structure:
 
 ```text
 Frontend (React + TypeScript + Vite)
@@ -195,29 +195,29 @@ Frontend (React + TypeScript + Vite)
       PostgreSQL / Supabase
 ```
 
-Frontend deployas på Vercel och backend deployas separat på Render.
+The frontend is deployed on Vercel and the backend is deployed separately on Render.
 
-När frontend är deployad kommer `VITE_API_URL` att peka på den publicerade FastAPI-servern på Render.
+Once the frontend is deployed, `VITE_API_URL` will point to the published FastAPI server on Render.
 
-Backend behöver `DATABASE_URL` som miljövariabel på Render för att kunna ansluta till databasen i Supabase.
+The backend needs `DATABASE_URL` as an environment variable on Render to be able to connect to the database in Supabase.
 
-## Uppdatering av erbjudanden
+## Updating offers
 
-`backend/app/fetch_offers.py` hämtar erbjudanden från CheapShark och sparar dem i databasen. Skriptet körs automatiskt varje timme av GitHub Actions-jobbet `.github/workflows/fetch-offers.yml` (kan också startas manuellt därifrån).
+`backend/app/fetch_offers.py` fetches offers from CheapShark and saves them to the database. The script runs automatically every hour via the GitHub Actions job `.github/workflows/fetch-offers.yml` (it can also be started manually from there).
 
-För att jobbet ska kunna nå databasen behöver repots hemlighet `DATABASE_URL` finnas under **Settings → Secrets and variables → Actions** i GitHub och peka på samma databas som backend använder.
+For the job to reach the database, the repo secret `DATABASE_URL` must exist under **Settings → Secrets and variables → Actions** on GitHub and point to the same database the backend uses.
 
-`/offers`-endpointen döljer erbjudanden som är äldre än `STALE_AFTER_HOURS` timmar (standard 6) så att ett missat schemalagt jobb inte visar erbjudanden som kan ha gått ut hos butiken.
+The `/offers` endpoint hides offers older than `STALE_AFTER_HOURS` hours (default 6) so that a missed scheduled job doesn't show offers that may have expired at the store.
 
-Den visar dessutom bara gratisspel och erbjudanden med minst `MIN_SAVINGS_PERCENT` procent rabatt (standard 80). Mindre rabatter sparas i databasen men lämnas inte ut.
+It also only shows free games and offers with at least `MIN_SAVINGS_PERCENT` percent off (default 80). Smaller discounts are saved in the database but not returned.
 
-## Populära gratisspel
+## Popular free games
 
-Spel som alltid är gratis (free to play) hanteras separat från erbjudandena, eftersom CheapShark inte listar dem. `backend/app/fetch_free_games.py` söker på Steam efter free to play-spel, bekräftar varje kandidat med Steams `appdetails` (riktigt spel och `is_free`) och sparar de 150 populäraste i tabellen `free_games`. Jobbet `.github/workflows/fetch-free-games.yml` kör det en gång per dygn och kan även startas manuellt.
+Games that are always free (free to play) are handled separately from the offers, since CheapShark doesn't list them. `backend/app/fetch_free_games.py` searches Steam for free to play games, confirms each candidate with Steam's `appdetails` (a real game and `is_free`) and saves the 150 most popular in the `free_games` table. The job `.github/workflows/fetch-free-games.yml` runs it once a day and can also be started manually.
 
-Listan lämnas ut av `GET /free-games`, populärast först. Den har ingen färskhetskoll som `/offers`, eftersom ett free to play-spel inte slutar vara gratis över en natt. Frontend visar den som en mindre sektion, "Populära gratisspel", under erbjudandena. Genrefiltret gäller båda sektionerna, butiksfiltret bara erbjudandena.
+The list is returned by `GET /free-games`, most popular first. It has no freshness check like `/offers`, since a free to play game doesn't stop being free overnight. The frontend shows it as a smaller section, "Popular free games", below the offers. The genre filter applies to both sections, the store filter only to the offers.
 
-Tabellen skapas av `backend/schema.sql`, som kan köras om utan att skriva över data. Manuell körning:
+The table is created by `backend/schema.sql`, which can be re-run without overwriting data. Manual run:
 
 ```bash
 cd backend
@@ -226,24 +226,24 @@ python -m app.fetch_free_games
 
 ## CORS
 
-Under lokal utveckling tillåter backend anrop från:
+During local development the backend allows requests from:
 
 ```text
 http://localhost:5173
 ```
 
-När frontend deployas till Vercel behöver även den publicerade Vercel-adressen läggas till som tillåten adress i backend.
+When the frontend is deployed to Vercel, the published Vercel address also needs to be added as an allowed origin in the backend.
 
-## Projektstatus
+## Project status
 
-Projektet är under utveckling.
+The project is under development.
 
-För närvarande finns:
+Currently in place:
 
 - React + TypeScript + Vite frontend
-- FastAPI-backend
-- PostgreSQL-anslutning via SQLAlchemy
-- Supabase som databas
-- `/health` endpoint för att kontrollera backend och databas
-- Frontend som kontrollerar anslutningen till backend
-- Stöd för olika backend-adresser genom `VITE_API_URL`
+- FastAPI backend
+- PostgreSQL connection via SQLAlchemy
+- Supabase as the database
+- `/health` endpoint to check the backend and database
+- Frontend that checks the connection to the backend
+- Support for different backend addresses through `VITE_API_URL`

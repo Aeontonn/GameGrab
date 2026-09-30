@@ -3,32 +3,32 @@ import { API_URL, fetchFreeGames, fetchOffers } from './api'
 import { STORES } from './types'
 import type { FreeGame, Offer } from './types'
 
-// Kryssar i värdet om det är omarkerat, kryssar ur det om det redan är valt.
+// Checks the value if it's unchecked, unchecks it if it's already selected.
 const toggle = (list: string[], value: string) =>
   list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 
-// Texten som visar hur länge erbjudandet gäller, eller null om butiken inte
-// uppger något slutdatum. Räknar hela dygn framåt, så "2 dagar kvar" betyder
-// att det finns minst 2 dygn kvar – och sista dygnet säger vi timmar, för
-// "0 dagar kvar" låter som att det redan är slut.
+// The text that shows how long the offer lasts, or null if the store doesn't
+// provide an end date. Counts whole days ahead, so "2 days left" means there
+// are at least 2 full days left – and on the last day we say hours, because
+// "0 days left" sounds like it has already ended.
 const timeLeft = (endsAt: string | null): string | null => {
   if (!endsAt) return null
 
   const msLeft = new Date(endsAt).getTime() - Date.now()
-  if (msLeft <= 0) return 'Slutar snart'
+  if (msLeft <= 0) return 'Ending soon'
 
   const hours = Math.floor(msLeft / 3_600_000)
-  if (hours < 24) return hours <= 1 ? 'Mindre än 1 timme kvar' : `${hours} timmar kvar`
+  if (hours < 24) return hours <= 1 ? 'Less than 1 hour left' : `${hours} hours left`
 
   const days = Math.floor(hours / 24)
-  return days === 1 ? '1 dag kvar' : `${days} dagar kvar`
+  return days === 1 ? '1 day left' : `${days} days left`
 }
 
-// Valet "Slutar inom 2 dagar" visar erbjudanden som går ut inom så här många dagar.
-// Med 7 dagar kom nästan alla erbjudanden med, så valet sa ingenting.
+// The "Ends within 2 days" option shows offers that expire within this many days.
+// With 7 days nearly every offer was included, so the option said nothing.
 const ENDING_SOON_DAYS = 2
 
-// Ett erbjudande som kort.
+// One offer as a card.
 function OfferCard({ offer }: { offer: Offer }) {
   const left = timeLeft(offer.ends_at)
 
@@ -44,7 +44,7 @@ function OfferCard({ offer }: { offer: Offer }) {
 
       <p className="price">
         {offer.is_free ? (
-          <strong>Gratis just nu</strong>
+          <strong>Free right now</strong>
         ) : (
           <>
             <s>${offer.normal_price.toFixed(2)}</s> ${offer.sale_price.toFixed(2)}
@@ -55,21 +55,21 @@ function OfferCard({ offer }: { offer: Offer }) {
 
       {left && <p className="time-left">{left}</p>}
 
-      {/* Lämnar sidan, så vi öppnar i ny flik. */}
+      {/* Leaves the site, so we open in a new tab. */}
       <a href={offer.claim_url} target="_blank" rel="noopener noreferrer">
-        Hämta på {offer.store} →
+        Get it on {offer.store} →
       </a>
     </li>
   )
 }
 
-// De lägen sidan kan vara i medan den hämtar erbjudanden.
+// The states the page can be in while it fetches offers.
 type Load =
   | { state: 'loading' }
   | { state: 'ok'; offers: Offer[] }
   | { state: 'error'; message: string }
 
-// "Alltid gratis" laddas för sig, så att ett fel där inte tar ner erbjudandena.
+// "Always free" loads separately, so an error there doesn't take down the offers.
 type FreeLoad =
   | { state: 'loading' }
   | { state: 'ok'; games: FreeGame[] }
@@ -79,21 +79,21 @@ function App() {
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [freeLoad, setFreeLoad] = useState<FreeLoad>({ state: 'loading' })
 
-  // Tiden när sidan öppnades. Avgör vad som räknas som "slutar snart".
+  // The time the page was opened. Decides what counts as "ending soon".
   const [openedAt] = useState(() => Date.now())
 
-  // Vilka butiker som är förkryssade. Tom lista betyder "visa alla".
+  // Which stores are checked. An empty list means "show all".
   const [stores, setStores] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
 
-  // Vilka genrer som är förkryssade. Tom lista betyder "visa alla".
+  // Which genres are checked. An empty list means "show all".
   const [genres, setGenres] = useState<string[]>([])
 
-  // Om bara erbjudanden som slutar snart ska visas. Av från början – besökaren
-  // får aktivt välja det.
+  // Whether only offers ending soon should be shown. Off by default – the
+  // visitor has to actively choose it.
   const [endingSoonOnly, setEndingSoonOnly] = useState(false)
 
-  // Körs en gång när sidan laddas: hämta erbjudandena från backend.
+  // Runs once when the page loads: fetch the offers from the backend.
   useEffect(() => {
     fetchOffers()
       .then((offers) => setLoad({ state: 'ok', offers }))
@@ -111,9 +111,9 @@ function App() {
     [freeLoad],
   )
 
-  // Genrerna som faktiskt finns bland spelen, i bokstavsordning. Hämtas ur
-  // datan i stället för att skrivas in, så att filtret aldrig visar en genre
-  // som inte har några spel. Gäller båda sektionerna.
+  // The genres that actually exist among the games, in alphabetical order. Taken
+  // from the data instead of being hardcoded, so the filter never shows a genre
+  // that has no games. Applies to both sections.
   const allGenres = useMemo(() => {
     const offers = load.state === 'ok' ? load.offers : []
     const found = new Set([
@@ -123,20 +123,20 @@ function App() {
     return [...found].sort((a, b) => a.localeCompare(b, 'en'))
   }, [load, freeGames])
 
-  // Sökfältet matchar på titeln, utan hänsyn till versaler.
+  // The search field matches on the title, case-insensitively.
   const matchesSearch = useCallback(
     (title: string) => title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
     [searchTerm],
   )
 
-  // Ett spel visas om det matchar någon av de valda butikerna och någon av
-  // de valda genrerna. Är en grupp tom filtrerar den inte alls.
+  // A game is shown if it matches any of the selected stores and any of the
+  // selected genres. An empty group doesn't filter at all.
   //
-  // Med "Slutar inom 2 dagar" ikryssat visas bara erbjudanden med känt
-  // slutdatum inom gränsen, och det som slutar först hamnar överst.
-  // Gränsen följer det kortet visar: allt som står som "2 dagar kvar" eller
-  // mindre ska med. Kortet avrundar nedåt, så 2 dagar och 8 timmar visas som
-  // "2 dagar kvar" – därför går gränsen vid ett dygn extra.
+  // With "Ends within 2 days" checked, only offers with a known end date
+  // within the limit are shown, and whatever ends first is at the top.
+  // The limit follows what the card shows: everything shown as "2 days left"
+  // or less should be included. The card rounds down, so 2 days and 8 hours
+  // shows as "2 days left" – that's why the limit is one extra day.
   const visible = useMemo(() => {
     if (load.state !== 'ok') return []
 
@@ -154,8 +154,8 @@ function App() {
       .sort((a, b) => new Date(a.ends_at!).getTime() - new Date(b.ends_at!).getTime())
   }, [load, stores, genres, endingSoonOnly, openedAt, matchesSearch])
 
-  // Genrefiltret gäller även "Alltid gratis". Butiksfiltret gör det inte,
-  // eftersom de spelen nästan alla ligger på Steam.
+  // The genre filter also applies to "Always free". The store filter doesn't,
+  // since nearly all of those games are on Steam.
   const visibleFree = useMemo(
     () =>
       freeGames.filter(
@@ -169,15 +169,15 @@ function App() {
   const anyFilter = stores.length > 0 || genres.length > 0 || endingSoonOnly
 
   if (load.state === 'loading') {
-    return <p className="status">Hämtar erbjudanden…</p>
+    return <p className="status">Fetching offers…</p>
   }
 
   if (load.state === 'error') {
     return (
       <div className="status">
         <h1>GameGrab</h1>
-        <p className="error">Ingen kontakt med backend: {load.message}</p>
-        <p>Kontrollera att servern kör på {API_URL}</p>
+        <p className="error">Can't reach the backend: {load.message}</p>
+        <p>Check that the server is running on {API_URL}</p>
       </div>
     )
   }
@@ -186,12 +186,12 @@ function App() {
     <>
       <header>
         <h1>GameGrab</h1>
-        <p>Gratis och rabatterade PC-spel, samlade på ett ställe.</p>
+        <p>Free and discounted PC games, all in one place.</p>
       </header>
 
       <div className="layout">
         <aside>
-          <h2>Butik</h2>
+          <h2>Store</h2>
           {STORES.map((store) => (
             <label key={store} className="filter-option">
               <input
@@ -224,32 +224,32 @@ function App() {
             }}
             disabled={!anyFilter}
           >
-            Visa alla
+            Show all
           </button>
 
-          {/* Ligger under "Visa alla", avskilt från butik och genre: det är ett
-              eget val man gör aktivt, inte ett av de vanliga filtren. */}
+          {/* Sits below "Show all", separate from store and genre: it's a
+              choice you make actively, not one of the regular filters. */}
           <div className="time-filter">
-            <h2>Tid kvar</h2>
+            <h2>Time left</h2>
             <label className="filter-option">
               <input
                 type="checkbox"
                 checked={endingSoonOnly}
                 onChange={() => setEndingSoonOnly((current) => !current)}
               />
-              Slutar inom {ENDING_SOON_DAYS} dagar
+              Ends within {ENDING_SOON_DAYS} days
             </label>
           </div>
         </aside>
 
         <main>
-          <h2>Gratis och på rea</h2>
+          <h2>Free and on sale</h2>
           <div className="search-bar">
             <span className="search-icon">⌕</span>
 
             <input
               type="search"
-              placeholder="Sök efter spel..."
+              placeholder="Search for games..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -261,7 +261,7 @@ function App() {
 
           <p className="count">
             <strong>{visible.length}</strong>{' '}
-            {endingSoonOnly ? `erbjudanden slutar inom ${ENDING_SOON_DAYS} dagar` : 'erbjudanden'}
+            {endingSoonOnly ? `offers ending within ${ENDING_SOON_DAYS} days` : 'offers'}
           </p>
 
           <ul className="offers">
@@ -272,14 +272,14 @@ function App() {
 
           {freeLoad.state !== 'loading' && (
             <section className="always-free">
-              <h2>Populära gratisspel</h2>
+              <h2>Popular free games</h2>
 
               {freeLoad.state === 'error' ? (
-                <p className="error">Kunde inte hämta listan över gratisspel.</p>
+                <p className="error">Couldn't fetch the list of free games.</p>
               ) : (
                 <>
                   <p className="count">
-                    <strong>{visibleFree.length}</strong> free to play-spel
+                    <strong>{visibleFree.length}</strong> free to play games
                   </p>
 
                   <ul className="free-games">

@@ -1,8 +1,8 @@
-"""Hämtar gratis- och rabatterbjudanden från CheapShark och sparar dem i databasen.
+"""Fetches free and discounted offers from CheapShark and saves them to the database.
 
-Körs automatiskt varje timme av .github/workflows/fetch-offers.yml.
+Runs automatically every hour via .github/workflows/fetch-offers.yml.
 
-Kan också köras manuellt, t.ex. för att testa en ändring:
+Can also be run manually, e.g. to test a change:
 
     cd backend
     source venv/bin/activate
@@ -31,11 +31,11 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 API = "https://www.cheapshark.com/api/1.0/deals"
 
-# CheapShark kräver att anropet talar om vilken app som frågar, annars nekar de.
+# CheapShark requires requests to say which app is asking, otherwise they refuse.
 USER_AGENT = "GameGrab/0.1 (student project)"
 
-# De tre PC-butikerna vi bryr oss om. Nycklarna är CheapSharks egna id:n,
-# värdena är namnen vi vill visa i frontend.
+# The three PC stores we care about. The keys are CheapShark's own ids,
+# the values are the names we want to show in the frontend.
 STORES = {
     "1": "Steam",
     "7": "GOG",
@@ -43,12 +43,12 @@ STORES = {
 }
 
 
-# Ord som avslöjar att raden inte är ett fristående spel utan ett tillägg,
-# en dyrare utgåva eller ett paket. Vi vill bara ha själva spelen.
+# Words that reveal that the row is not a standalone game but an add-on,
+# a pricier edition or a bundle. We only want the games themselves.
 #
-# "Edition" täcker Deluxe, Gold, Ultimate, Premium och Game of the Year, som
-# alla slutar på det ordet. Ord som "Remastered" och "Director's Cut" står
-# medvetet inte med – de är fortfarande hela spel.
+# "Edition" covers Deluxe, Gold, Ultimate, Premium and Game of the Year, which
+# all end with that word. Words like "Remastered" and "Director's Cut" are
+# deliberately left out – those are still full games.
 EXCLUDE = re.compile(
     r"\b(DLC|Pack|Edition|Bundle|Collection|Season Pass|Upgrade|Soundtrack|Complete the Set)\b",
     re.IGNORECASE,
@@ -56,13 +56,14 @@ EXCLUDE = re.compile(
 
 
 def looks_like_extra(title: str) -> bool:
-    """Gissar utifrån titeln om raden är ett tillägg i stället för ett spel."""
+    """Guesses from the title whether the row is an add-on rather than a game."""
     return EXCLUDE.search(title) is not None
 
 
-# Steams genrer som faktiskt är genrer. Steam lägger även innehållsvarningar
-# (Violent, Nudity…), prismodeller (Free To Play) och Early Access i samma
-# lista – de ska inte bli val i genrefiltret. Id:na är desamma på alla språk.
+# Steam genres that are actually genres. Steam also puts content warnings
+# (Violent, Nudity…), pricing models (Free To Play) and Early Access in the same
+# list – those should not become options in the genre filter. The ids are the
+# same in every language.
 GAME_GENRE_IDS = {
     "1",   # Action
     "2",   # Strategy
@@ -78,12 +79,12 @@ GAME_GENRE_IDS = {
 
 
 def steam_details(app_id: str) -> dict | None:
-    """Frågar Steam vad något är (game, dlc, demo, music…) och vilka genrer det har.
+    """Asks Steam what something is (game, dlc, demo, music…) and which genres it has.
 
-    Returnerar None om Steam inte känner igen id:t eller inte svarar.
-    Det är Steams eget svar, inte en gissning – därför litar vi mer på den
-    här än på titeln. Genrerna hämtas på engelska, så att sajten fungerar
-    för besökare oavsett språk.
+    Returns None if Steam doesn't recognise the id or doesn't respond.
+    This is Steam's own answer, not a guess – so we trust it more than
+    the title. Genres are fetched in English, so the site works for
+    visitors regardless of language.
     """
     url = (
         "https://store.steampowered.com/api/appdetails"
@@ -113,9 +114,10 @@ def steam_details(app_id: str) -> dict | None:
 
 GOG_CATALOG = "https://catalog.gog.com/v1/catalog"
 
-# GOG har egna genrer, de flesta teman som Fantasy och Sci-fi. Bara de med en
-# tydlig motsvarighet bland Steams genrer tas med, översatta till Steams namn,
-# så att filtret inte får både "RPG" och "Role-playing". Resten slängs.
+# GOG has its own genres, most of them themes like Fantasy and Sci-fi. Only the
+# ones with a clear equivalent among Steam's genres are kept, translated to
+# Steam's names, so the filter doesn't get both "RPG" and "Role-playing". The
+# rest are dropped.
 GOG_TO_STEAM_GENRE = {
     "Action": "Action",
     "Shooter": "Action",
@@ -138,26 +140,28 @@ GOG_TO_STEAM_GENRE = {
 
 
 def normalize_title(title: str) -> str:
-    """Gör titlar jämförbara: små bokstäver, bara bokstäver och siffror."""
+    """Makes titles comparable: lowercase, letters and digits only."""
     return re.sub(r"[^a-z0-9]", "", title.lower())
 
 
 @lru_cache(maxsize=None)
 def gog_find(title: str) -> dict | None:
-    """Letar upp titeln i GOG:s katalog och returnerar GOG:s egen post för spelet.
+    """Looks up the title in GOG's catalog and returns GOG's own entry for the game.
 
-    Bara exakt samma titel räknas. En lösare sökning hittar lätt fel spel,
-    som Fallout 76 när vi letar efter Fallout.
+    Only the exact same title counts. A looser search easily finds the wrong
+    game, like Fallout 76 when we're looking for Fallout.
 
-    Returnerar None om GOG inte hittar spelet eller inte svarar – katalogen
-    är inte officiellt dokumenterad och svarar ibland med fel. Svaret cachas,
-    så genre- och slutdatumsuppslagen för samma spel bara kostar ett anrop.
+    Returns None if GOG doesn't find the game or doesn't respond – the catalog
+    is not officially documented and sometimes responds with errors. The result
+    is cached, so the genre and end date lookups for the same game only cost
+    one request.
     """
     params = urlencode({"query": f"like:{title}", "limit": 10})
     request = Request(f"{GOG_CATALOG}?{params}", headers={"User-Agent": USER_AGENT})
 
-    # GOG svarar ibland 503 en kort stund. Tre försök med paus emellan räcker
-    # oftast, och gäller bara de få spel som saknar Steam-id.
+    # GOG sometimes responds 503 for a short while. Three attempts with a pause
+    # in between is usually enough, and only applies to the few games without
+    # a Steam id.
     products = None
     for attempt in range(3):
         try:
@@ -175,7 +179,7 @@ def gog_find(title: str) -> dict | None:
 
 
 def gog_details(title: str) -> dict | None:
-    """Reserv för spel utan Steam-id: slår upp genre och typ i GOG:s katalog."""
+    """Fallback for games without a Steam id: looks up genre and type in GOG's catalog."""
     match = gog_find(title)
     if match is None:
         return None
@@ -186,50 +190,50 @@ def gog_details(title: str) -> dict | None:
         if steam_name and steam_name not in genres:
             genres.append(steam_name)
 
-    # GOG säger game, dlc eller pack. Bara dlc betyder säkert "inte ett spel":
-    # GOG kallar även hela spel som Fallout och Fallout 2 för pack, eftersom de
-    # levereras med extramaterial. Riktiga paket fångas redan av titelregeln.
+    # GOG says game, dlc or pack. Only dlc reliably means "not a game":
+    # GOG also calls full games like Fallout and Fallout 2 packs, since they
+    # ship with extra material. Real bundles are already caught by the title rule.
     kind = "dlc" if match.get("productType") == "dlc" else "game"
     return {"type": kind, "is_free": False, "genres": genres}
 
 
 def classify(deal: dict) -> tuple[bool, list[str]]:
-    """Ska erbjudandet med till frontend, och vilka genrer har spelet?
+    """Should the offer be sent to the frontend, and which genres does the game have?
 
-    Titeln kollas först eftersom det är gratis. Bara det som överlever
-    kostar oss ett anrop till Steam – och samma anrop ger oss genrerna.
-    Genren hör till spelet, inte butiken, så Steam kan svara även när
-    rean gäller GOG eller Epic. Saknas Steam-id tar GOG:s katalog över.
+    The title is checked first since it's free. Only what survives costs
+    us a request to Steam – and the same request gives us the genres.
+    The genre belongs to the game, not the store, so Steam can answer even
+    when the sale is on GOG or Epic. Without a Steam id, GOG's catalog takes over.
     """
     if looks_like_extra(deal["title"]):
         return False, []
 
     app_id = deal.get("steamAppID")
 
-    # Med Steam-id frågar vi Steam. Utan id, eller om Steam inte svarar,
-    # försöker vi med GOG:s katalog i stället.
+    # With a Steam id we ask Steam. Without an id, or if Steam doesn't respond,
+    # we try GOG's catalog instead.
     details = steam_details(app_id) if app_id else None
     if details is None:
         details = gog_details(deal["title"])
 
-    # Svarade ingen av dem vill vi hellre behålla raden än tappa ett riktigt
-    # spel. Spelet visas då utan genre.
+    # If neither responded we'd rather keep the row than lose a real
+    # game. The game is then shown without a genre.
     if details is None:
         return True, []
 
     return details["type"] == "game", details["genres"]
 
 
-# Vi visar bara gratisspel och erbjudanden med minst så här stor rabatt (samma
-# gräns som MIN_SAVINGS_PERCENT i main.py). Slutdatum slår vi bara upp för dem.
+# We only show free games and offers with at least this much discount (same
+# threshold as MIN_SAVINGS_PERCENT in main.py). We only look up end dates for those.
 MIN_SHOWN_SAVINGS = 80
 
 
 def steam_end_dates(app_ids: list[str]) -> dict[str, datetime]:
-    """Frågar Steam när rean tar slut, för många spel i taget.
+    """Asks Steam when the sale ends, for many games at a time.
 
-    Returnerar {steam-id: slutdatum}. Spel utan pågående rea, eller utan
-    känt slutdatum, saknas i svaret.
+    Returns {steam id: end date}. Games without an ongoing sale, or without
+    a known end date, are missing from the result.
     """
     found: dict[str, datetime] = {}
 
@@ -265,10 +269,10 @@ def steam_end_dates(app_ids: list[str]) -> dict[str, datetime]:
 
 
 def epic_end_dates() -> dict[str, datetime]:
-    """Hämtar Epics egen lista över pågående kampanjer, med slutdatum.
+    """Fetches Epic's own list of ongoing promotions, with end dates.
 
-    Returnerar {normaliserad titel: slutdatum}. CheapShark ger inget Epic-id,
-    så spelen måste matchas på titel.
+    Returns {normalized title: end date}. CheapShark doesn't provide an Epic id,
+    so games have to be matched by title.
     """
     url = (
         "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions"
@@ -283,8 +287,8 @@ def epic_end_dates() -> dict[str, datetime]:
 
     found: dict[str, datetime] = {}
     for element in elements:
-        # promotionalOffers är det som gäller nu. Kommande kampanjer ligger
-        # i ett eget fält och ska inte förväxlas med dem.
+        # promotionalOffers is what applies right now. Upcoming promotions live
+        # in a separate field and must not be confused with them.
         for group in (element.get("promotions") or {}).get("promotionalOffers", []):
             for offer in group["promotionalOffers"]:
                 found[normalize_title(element["title"])] = datetime.fromisoformat(
@@ -294,17 +298,17 @@ def epic_end_dates() -> dict[str, datetime]:
     return found
 
 
-# GOG:s produktsida har slutdatumet inbäddat som JavaScript, t.ex.
+# GOG's product page has the end date embedded as JavaScript, e.g.
 # cardProductPromoEndDate = {"date":"2026-10-07 09:59:59.000000","timezone_type":1,"timezone":"+03:00"}
 GOG_PROMO_END = re.compile(r"cardProductPromoEndDate\s*=\s*(\{.*?\})")
 
 
 def gog_end_date(title: str) -> datetime | None:
-    """Läser slutdatumet från spelets sida hos GOG.
+    """Reads the end date from the game's page on GOG.
 
-    GOG har inget API för det – katalogen saknar fältet – så vi läser sidan.
-    Det är inte dokumenterat och kan sluta fungera om GOG bygger om sidan;
-    då blir svaret None och erbjudandet visas utan nedräkning.
+    GOG has no API for it – the catalog lacks the field – so we read the page.
+    This is undocumented and may stop working if GOG rebuilds the page;
+    the result is then None and the offer is shown without a countdown.
     """
     match = gog_find(title)
     if match is None:
@@ -319,8 +323,8 @@ def gog_end_date(title: str) -> datetime | None:
         with urlopen(request, timeout=30) as response:
             html = response.read().decode("utf-8", errors="replace")
         promo = json.loads(GOG_PROMO_END.search(html).group(1))
-        # timezone_type 1 betyder att tidszonen är en fast offset som "+03:00".
-        # Andra typer har vi inte sett, och gissar hellre inte om.
+        # timezone_type 1 means the time zone is a fixed offset like "+03:00".
+        # We haven't seen other types, and would rather not guess.
         if promo["timezone_type"] != 1:
             return None
         return datetime.fromisoformat(promo["date"][:19] + promo["timezone"])
@@ -329,10 +333,10 @@ def gog_end_date(title: str) -> datetime | None:
 
 
 def add_end_dates(rows: list[dict]) -> None:
-    """Fyller i ends_at på raderna, från den butik som erbjudandet gäller.
+    """Fills in ends_at on the rows, from the store the offer applies to.
 
-    Sätter None när butiken inte uppger något slutdatum. Steam kollas bara
-    för Steam-rader: ett spel kan vara på rea på GOG utan att vara det på Steam.
+    Sets None when the store doesn't provide an end date. Steam is only checked
+    for Steam rows: a game can be on sale on GOG without being on sale on Steam.
     """
     steam = steam_end_dates(
         [row["steam_app_id"] for row in rows if row["store"] == "Steam" and row["steam_app_id"]]
@@ -349,7 +353,7 @@ def add_end_dates(rows: list[dict]) -> None:
 
 
 def fetch_page(**params) -> list[dict]:
-    """Ställer en fråga till CheapShark och returnerar svaret som en lista."""
+    """Sends one query to CheapShark and returns the response as a list."""
     url = f"{API}?{urlencode(params)}"
     request = Request(url, headers={"User-Agent": USER_AGENT})
 
@@ -358,43 +362,43 @@ def fetch_page(**params) -> list[dict]:
 
 
 def collect() -> list[dict]:
-    """Samlar ihop erbjudanden från CheapShark.
+    """Collects offers from CheapShark.
 
-    Två sorters anrop, eftersom sajten handlar om både gratis och rabatterat:
-    de bäst betygsatta fynden, plus allt som just nu är helt gratis.
+    Two kinds of requests, since the site is about both free and discounted:
+    the top-rated deals, plus everything that is completely free right now.
     """
     store_ids = ",".join(STORES)
     deals: dict[str, dict] = {}
 
-    # Tre sidor av de fynd CheapShark själva rankar högst.
+    # Three pages of the deals CheapShark itself ranks highest.
     for page in range(3):
         for deal in fetch_page(
             storeID=store_ids, pageSize=60, pageNumber=page, sortBy="Deal Rating"
         ):
             deals[deal["dealID"]] = deal
 
-    # Allt som kostar noll just nu. Samlas separat, annars riskerar de
-    # att hamna utanför de tre sidorna ovan.
+    # Everything that costs zero right now. Collected separately, otherwise
+    # they risk falling outside the three pages above.
     for deal in fetch_page(storeID=store_ids, pageSize=60, upperPrice=0):
         deals[deal["dealID"]] = deal
 
-    # Nyckeln är dealID, så samma erbjudande kan bara förekomma en gång.
+    # The key is dealID, so the same offer can only appear once.
     return list(deals.values())
 
 
 def to_row(deal: dict, genres: list[str]) -> dict:
-    """Översätter CheapSharks fältnamn till våra kolumnnamn."""
+    """Translates CheapShark's field names to our column names."""
     steam_app_id = deal.get("steamAppID")
     store = STORES[deal["storeID"]]
 
-    # Gäller rean Steam kan vi länka rakt till butikssidan.
+    # If the sale is on Steam we can link straight to the store page.
     #
-    # För GOG och Epic får CheapShark skicka besökaren vidare. Deras dealID är
-    # redan url-kodat i svaret, så det ska inte kodas en gång till.
+    # For GOG and Epic, CheapShark redirects the visitor. Their dealID is
+    # already URL-encoded in the response, so it must not be encoded again.
     #
-    # Viktigt: bara för Steam. Många GOG- och Epic-spel finns också på Steam och
-    # har ett steamAppID, men rean gäller inte där – då hade vi skickat besökaren
-    # till fel butik och fel pris.
+    # Important: Steam only. Many GOG and Epic games are also on Steam and
+    # have a steamAppID, but the sale doesn't apply there – we would then send
+    # the visitor to the wrong store and the wrong price.
     if store == "Steam" and steam_app_id:
         claim_url = f"https://store.steampowered.com/app/{steam_app_id}/"
     else:
@@ -414,13 +418,13 @@ def to_row(deal: dict, genres: list[str]) -> dict:
         "steam_app_id": steam_app_id,
         "claim_url": claim_url,
         "genres": genres,
-        # Fylls i av add_end_dates. None betyder att slutdatumet är okänt.
+        # Filled in by add_end_dates. None means the end date is unknown.
         "ends_at": None,
     }
 
 
-# deal_id är UNIQUE i tabellen. Känner databasen igen erbjudandet uppdateras
-# raden i stället för att en dubblett skapas.
+# deal_id is UNIQUE in the table. If the database recognises the offer, the
+# row is updated instead of creating a duplicate.
 UPSERT = text("""
     INSERT INTO offers (
         deal_id, title, store, normal_price, sale_price,
@@ -440,31 +444,31 @@ UPSERT = text("""
         thumb        = EXCLUDED.thumb,
         steam_app_id = EXCLUDED.steam_app_id,
         claim_url    = EXCLUDED.claim_url,
-        -- Ett spels genrer ändras inte. Misslyckades uppslaget den här gången
-        -- (Steam eller GOG svarade inte) behåller vi de genrer vi redan har.
+        -- A game's genres don't change. If the lookup failed this time
+        -- (Steam or GOG didn't respond) we keep the genres we already have.
         genres       = CASE WHEN EXCLUDED.genres = '{}' THEN offers.genres
                             ELSE EXCLUDED.genres END,
-        -- Samma sak för slutdatumet: misslyckas uppslaget behåller vi det vi har.
-        -- Ett datum som hunnit passera döljs ändå av /offers.
+        -- Same for the end date: if the lookup fails we keep what we have.
+        -- A date that has already passed is hidden by /offers anyway.
         ends_at      = COALESCE(EXCLUDED.ends_at, offers.ends_at),
         fetched_at   = now()
 """)
 
 
 def save(rows: list[dict]) -> None:
-    """Sparar raderna. Allt eller inget – går något fel skrivs ingenting."""
+    """Saves the rows. All or nothing – if anything fails, nothing is written."""
     with engine.begin() as connection:
         connection.execute(UPSERT, rows)
 
 
 def remove_stale(keep: list[str]) -> int:
-    """Tar bort rader som inte längre finns hos CheapShark.
+    """Removes rows that no longer exist on CheapShark.
 
-    Utan det här skulle ett erbjudande som tagit slut ligga kvar för alltid
-    och visas som aktivt – det värsta en sån här sajt kan göra.
+    Without this, an offer that has ended would stay forever and be shown
+    as active – the worst thing a site like this can do.
     """
     if not keep:
-        # Tom lista betyder att hämtningen gick fel. Rör då ingenting.
+        # An empty list means the fetch went wrong. Don't touch anything.
         return 0
 
     with engine.begin() as connection:
@@ -476,32 +480,32 @@ def remove_stale(keep: list[str]) -> int:
 
 
 def main() -> None:
-    print("Hämtar från CheapShark…")
+    print("Fetching from CheapShark…")
     deals = collect()
-    print(f"  {len(deals)} erbjudanden hämtade")
+    print(f"  {len(deals)} offers fetched")
 
-    print("Sorterar bort tillägg, utgåvor och paket…")
+    print("Filtering out add-ons, editions and bundles…")
     rows = []
     for deal in deals:
         keep, genres = classify(deal)
         if keep:
             rows.append(to_row(deal, genres))
-    print(f"  {len(deals) - len(rows)} bortsorterade, {len(rows)} spel kvar")
-    print(f"  {sum(1 for row in rows if row['genres'])} av dem har genre (från Steam eller GOG)")
+    print(f"  {len(deals) - len(rows)} filtered out, {len(rows)} games left")
+    print(f"  {sum(1 for row in rows if row['genres'])} of them have a genre (from Steam or GOG)")
 
-    print("Hämtar slutdatum…")
+    print("Fetching end dates…")
     add_end_dates(rows)
-    print(f"  {sum(1 for row in rows if row['ends_at'])} av {len(rows)} har slutdatum")
+    print(f"  {sum(1 for row in rows if row['ends_at'])} of {len(rows)} have an end date")
 
     save(rows)
 
     stale = remove_stale([row["deal_id"] for row in rows])
     if stale:
-        print(f"  {stale} gamla erbjudanden borttagna")
+        print(f"  {stale} old offers removed")
 
     free = sum(1 for row in rows if row["is_free"])
     print()
-    print(f"Sparade {len(rows)} spel, varav {free} helt gratis.")
+    print(f"Saved {len(rows)} games, of which {free} are completely free.")
 
     for store in STORES.values():
         print(f"  {store:<12} {sum(1 for r in rows if r['store'] == store)}")
