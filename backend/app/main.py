@@ -7,32 +7,32 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 import os
 
-# Läser in inställningar från backend/.env. Full sökväg, så filen hittas oavsett vilken mapp servern startas från.
+# Loads settings from backend/.env. Full path, so the file is found regardless of which folder the server is started from.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-# Databasadressen bor i .env och följer aldrig med upp till GitHub.
+# The database address lives in .env and is never pushed to GitHub.
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Säger ifrån vid start i stället för att krascha vid första besöket.
+# Complains at startup instead of crashing on the first visit.
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set in backend/.env")
 
-# Erbjudanden hämtas var 3:e timme (se .github/workflows/fetch-offers.yml).
-# Ligger en rad kvar längre än så har hämtningen sannolikt slutat köra, och
-# erbjudandet kan redan ha gått ut hos butiken – då hellre dölja det än visa
-# något som kanske inte längre stämmer.
+# Offers are fetched every 3 hours (see .github/workflows/fetch-offers.yml).
+# If a row stays longer than that, the fetch has probably stopped running, and
+# the offer may already have expired at the store – better to hide it than show
+# something that may no longer be true.
 STALE_AFTER_HOURS = float(os.getenv("STALE_AFTER_HOURS", "6"))
 
-# GameGrab visar bara riktiga fynd: gratisspel och minst 80 % rabatt.
-# Mindre rabatter finns kvar i databasen men lämnas aldrig ut.
+# GameGrab only shows real bargains: free games and at least 80% off.
+# Smaller discounts stay in the database but are never returned.
 MIN_SAVINGS_PERCENT = float(os.getenv("MIN_SAVINGS_PERCENT", "80"))
 
-# Sköter all kontakt med databasen. pool_pre_ping kollar att kopplingen lever, eftersom databaser på nätet stänger oanvända kopplingar.
+# Handles all contact with the database. pool_pre_ping checks that the connection is alive, since hosted databases close idle connections.
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 app = FastAPI(title="GameGrab API")
 
-# Släpper igenom anrop från vår frontend. Byts mot riktig adress vid lansering.
+# Lets requests from our frontend through. Replace with the real address at launch.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "https://gamegrab.vercel.app"],
@@ -42,15 +42,15 @@ app.add_middleware(
 )
 
 
-# Svarar på: lever servern, och når den databasen?
+# Answers: is the server alive, and can it reach the database?
 @app.get("/health")
 def health():
     try:
-        # SELECT 1 hämtar ingen riktig data – testar bara att kopplingen går fram.
+        # SELECT 1 fetches no real data – it only tests that the connection works.
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
     except SQLAlchemyError as exc:
-        # Kom inte fram till databasen. 503 = tjänsten är inte tillgänglig.
+        # Couldn't reach the database. 503 = service unavailable.
         return JSONResponse(
             status_code=503,
             content={
@@ -63,8 +63,8 @@ def health():
     return {"status": "ok", "database": "connected"}
 
 
-# Erbjudandena frontend ritar upp: färska, inte utgångna, och antingen gratis eller minst 80 procent rabatt.
-# Gratis först, därefter största rabatten – det mest lockande överst.
+# The offers the frontend renders: fresh, not expired, and either free or at least 80 percent off.
+# Free first, then biggest discount – the most tempting at the top.
 @app.get("/offers")
 def offers():
     try:
@@ -85,9 +85,9 @@ def offers():
                 },
             ).mappings().all()
     except SQLAlchemyError as exc:
-        # Samma felhantering som /health: kom vi inte fram till databasen
-        # säger vi det rakt ut i stället för att svara med en tom lista,
-        # som frontend hade tolkat som "inga erbjudanden finns".
+        # Same error handling as /health: if we couldn't reach the database
+        # we say so plainly instead of responding with an empty list,
+        # which the frontend would read as "there are no offers".
         return JSONResponse(
             status_code=503,
             content={
@@ -97,8 +97,8 @@ def offers():
             },
         )
 
-    # Postgres lämnar pris och rabatt som Decimal, och tidsstämpeln som ett
-    # datumobjekt. Inget av det kan skickas som JSON, så vi gör om dem här.
+    # Postgres returns price and discount as Decimal, and the timestamp as a
+    # date object. None of that can be sent as JSON, so we convert them here.
     return [
         {
             **dict(row),
@@ -106,16 +106,16 @@ def offers():
             "sale_price": float(row["sale_price"]),
             "savings": float(row["savings"]),
             "fetched_at": row["fetched_at"].isoformat(),
-            # None när butiken inte uppger något slutdatum.
+            # None when the store doesn't provide an end date.
             "ends_at": row["ends_at"].isoformat() if row["ends_at"] else None,
         }
         for row in rows
     ]
 
 
-# Spel som alltid är gratis (free to play), mest spelade först. Hämtas av
-# fetch_free_games.py en gång per dygn. Ingen färskhetskoll som i /offers:
-# ett free to play-spel slutar inte vara gratis över en natt.
+# Games that are always free (free to play), most played first. Fetched by
+# fetch_free_games.py once a day. No freshness check like in /offers:
+# a free to play game doesn't stop being free overnight.
 @app.get("/free-games")
 def free_games():
     try:

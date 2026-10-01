@@ -1,45 +1,45 @@
-// Ett erbjudande, precis som /offers lämnar ut det.
-// Fälten måste heta samma sak som kolumnerna i databasen.
+// An offer, exactly as /offers returns it.
+// The fields must have the same names as the columns in the database.
 export type Offer = {
   id: number
   title: string
 
-  // Steam, GOG eller Epic Games. Det vi filtrerar på.
+  // Steam, GOG or Epic Games. What we filter on.
   store: string
 
   normal_price: number
   sale_price: number
 
-  // Rabatt i procent. 100 betyder gratis.
+  // Discount in percent. 100 means free.
   savings: number
   is_free: boolean
 
   thumb: string | null
   steam_app_id: string | null
 
-  // Dit knappen leder: butikssidan där spelet hämtas.
+  // Where the button leads: the store page where the game is claimed.
   claim_url: string
 
-  // Spelets genrer enligt Steam, på engelska. Tom lista om Steam inte känner till spelet.
+  // The game's genres according to Steam, in English. Empty list if Steam doesn't know the game.
   genres: string[]
 
-  // När erbjudandet går ut, som ISO-tid. null när butiken inte uppger något.
+  // When the offer expires, as an ISO time. null when the store doesn't say.
   ends_at: string | null
 
-  // När raden senast hämtades från CheapShark.
+  // When the row was last fetched from CheapShark.
   fetched_at: string
 }
 
-// Ett spel som alltid är gratis (free to play), precis som /free-games lämnar ut det.
+// A game that is always free (free to play), exactly as /free-games returns it.
 export type FreeGame = {
   id: number
   title: string
   steam_app_id: string
   claim_url: string
 
-  // Spelets genrer enligt Steam, på engelska. Kan vara tom.
+  // The game's genres according to Steam, in English. May be empty.
   genres: string[]
 }
 
-// Butikerna vi hämtar från. Används för att bygga filtret.
+// The stores we fetch from. Used to build the filter.
 export const STORES = ['Steam', 'GOG', 'Epic Games'] as const

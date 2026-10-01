@@ -1,6 +1,6 @@
-// Knyter bara ihop de två andra tsconfig-filerna: en för vår appkod
-// (tsconfig.app.json) och en för byggverktygen (tsconfig.node.json).
-// De har olika regler eftersom de kör i olika miljöer.
+// Only ties together the two other tsconfig files: one for our app code
+// (tsconfig.app.json) and one for the build tools (tsconfig.node.json).
+// They have different rules since they run in different environments.
 {
   "files": [],
   "references": [

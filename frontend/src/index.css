@@ -1,23 +1,23 @@
-/* Färgerna är plockade direkt ur docs/design_1.png.
-   Formen är fortfarande avskalad – det är bara paletten som är på plats. */
+/* The colors are taken straight from docs/design_1.png.
+   The layout is still bare-bones – only the palette is in place. */
 
 :root {
-  /* Bakgrunder, ljusare ju närmare betraktaren de ligger. */
-  --bg: #14151a;        /* sidan */
-  --surface: #1b1d25;   /* korten */
-  --line: #23252f;      /* kantlinjer */
+  /* Backgrounds, lighter the closer they are to the viewer. */
+  --bg: #14151a;        /* the page */
+  --surface: #1b1d25;   /* the cards */
+  --line: #23252f;      /* borders */
   --line-strong: #2d2f38;
 
-  /* Vita nyanser, från rubriker ner till det minst viktiga. */
-  --text: #edeef2;      /* rubriker och titlar */
-  --text-dim: #888e96;  /* butik, priser, filterval */
-  --text-faint: #585d63; /* fotnoter och teknisk info */
+  /* Shades of white, from headings down to the least important. */
+  --text: #edeef2;      /* headings and titles */
+  --text-dim: #888e96;  /* store, prices, filter options */
+  --text-faint: #585d63; /* footnotes and technical info */
 
-  /* Statusfärger. Inte del av paletten, men de bär information. */
+  /* Status colors. Not part of the palette, but they carry information. */
   --ok: #4ade80;
   --error: #f87171;
 
-  /* Gör att kryssrutor och andra kontroller ritas mörka av webbläsaren. */
+  /* Makes the browser draw checkboxes and other controls dark. */
   color-scheme: dark;
 }
 
@@ -38,7 +38,7 @@ header p {
   color: var(--text-dim);
 }
 
-/* Filter till vänster, lista till höger. */
+/* Filters on the left, list on the right. */
 .layout {
   display: grid;
   grid-template-columns: 180px 1fr;
@@ -51,7 +51,7 @@ aside h2 {
   margin: 0 0 8px;
 }
 
-/* Luft mellan filtergrupperna, till exempel före "Genre". */
+/* Space between the filter groups, for example before "Genre". */
 .filter-option + h2 {
   margin-top: 20px;
 }
@@ -63,7 +63,7 @@ aside h2 {
   color: var(--text-dim);
 }
 
-/* Det valda filtret ska synas tydligare än de ovalda. */
+/* The selected filter should stand out more than the unselected ones. */
 .filter-option:has(input:checked) {
   color: var(--text);
 }
@@ -83,7 +83,7 @@ aside button:disabled {
   cursor: default;
 }
 
-/* "Tid kvar" står för sig under "Visa alla", med luft ovanför. */
+/* "Time left" sits on its own below "Show all", with space above. */
 .time-filter {
   margin-top: 32px;
 }
@@ -113,7 +113,7 @@ aside button:disabled {
   padding: 12px;
 }
 
-/* Bilden som visas högst upp på varje spelkort. */
+/* The image shown at the top of each game card. */
 .game-image {
   width: 100%;
   height: 140px;
@@ -136,7 +136,7 @@ aside button:disabled {
   color: var(--text-faint);
 }
 
-/* Genrerna på kortet: stödinformation, lika dämpad som priset. */
+/* The genres on the card: supporting info, as muted as the price. */
 .genres {
   margin: 0 0 8px;
   font-size: 13px;
@@ -148,7 +148,7 @@ aside button:disabled {
   color: var(--text-dim);
 }
 
-/* Överstruket ordinarie pris ska tona bort bakom reapriset. */
+/* The struck-through regular price should fade behind the sale price. */
 .price s {
   color: var(--text-faint);
 }
@@ -159,8 +159,8 @@ aside button:disabled {
   font-weight: 700;
 }
 
-/* Hur länge erbjudandet gäller. Full styrka, eftersom det är det som gör
-   att man klickar nu i stället för sen. */
+/* How long the offer lasts. Full strength, since that's what makes
+   people click now instead of later. */
 .time-left {
   margin: 0 0 8px;
   font-size: 13px;
@@ -168,7 +168,7 @@ aside button:disabled {
   color: var(--text);
 }
 
-/* Länken är sidans viktigaste klick, så den får full styrka. */
+/* The link is the most important click on the page, so it gets full strength. */
 .offers a {
   color: var(--text);
   text-decoration: none;
@@ -201,7 +201,7 @@ main > h2 {
   margin: 0 0 4px;
 }
 
-/* Mindre sektion under erbjudandena: kompakta rader i stället för kort. */
+/* Smaller section below the offers: compact rows instead of cards. */
 .always-free {
   margin-top: 40px;
   padding-top: 24px;
