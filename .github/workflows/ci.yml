@@ -1,6 +1,6 @@
-# Kontrollerar att koden fungerar innan den når main.
-# Körs på varje pull request mot main, och på varje push till main.
-# Resultatet syns som en grön bock eller ett rött kryss direkt i pull requesten.
+# Checks that the code works before it reaches main.
+# Runs on every pull request against main, and on every push to main.
+# The result shows up as a green check or a red cross directly in the pull request.
 
 name: CI
 
@@ -12,7 +12,7 @@ on:
 
 jobs:
   frontend:
-    name: Frontend bygger
+    name: Frontend builds
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -21,34 +21,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Vite kräver Node 20.19 eller 22.12 och senare.
+      # Vite requires Node 20.19 or 22.12 and later.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # npm ci installerar exakt det som står i package-lock.json och
-      # stoppar om filen är trasig – samma fel som Vercel annars hittar först.
+      # npm ci installs exactly what's in package-lock.json and
+      # stops if the file is broken – the same error Vercel would otherwise find first.
       - run: npm ci
 
       - name: Lint
         run: npx oxlint
 
-      # Kör även TypeScripts typkontroll, eftersom build-skriptet börjar med tsc.
-      - name: Bygg
+      # Also runs TypeScript's type check, since the build script starts with tsc.
+      - name: Build
         run: npm run build
 
   backend:
-    name: Backend startar
+    name: Backend starts
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
 
-    # main.py vägrar starta utan DATABASE_URL. Adressen här är påhittad:
-    # SQLAlchemy ansluter först när ett anrop kommer, så det räcker för att
-    # kontrollera att koden laddar. Den riktiga adressen lämnar aldrig Render.
+    # main.py refuses to start without DATABASE_URL. The address here is made up:
+    # SQLAlchemy only connects when a request comes in, so it's enough to
+    # check that the code loads. The real address never leaves Render.
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
 
@@ -63,10 +63,10 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      # Fångar syntaxfel i alla filer.
+      # Catches syntax errors in all files.
       - name: Syntax
         run: python -m compileall -q app
 
-      # Fångar felstavade importer och fel i uppsättningen av FastAPI.
-      - name: Laddar
+      # Catches misspelled imports and errors in the FastAPI setup.
+      - name: Loads
         run: python -c "import app.main, app.fetch_offers"

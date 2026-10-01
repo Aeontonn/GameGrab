@@ -1,26 +1,26 @@
 import type { FreeGame, Offer } from './types'
 
-// Adressen till backend. Sätts som miljövariabel vid deploy, annars den lokala servern.
+// The backend address. Set as an environment variable on deploy, otherwise the local server.
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 export { API_URL }
 
-// Hämtar alla erbjudanden. Backend sorterar redan gratis först och
-// största rabatten därefter, så vi behöver inte sortera om här.
+// Fetches all offers. The backend already sorts free first and
+// biggest discount after that, so we don't need to re-sort here.
 export async function fetchOffers(): Promise<Offer[]> {
   const response = await fetch(`${API_URL}/offers`)
 
-  // Backend svarar 503 om den inte når databasen. Då ska vi visa ett fel,
-  // inte en tom lista – en tom lista ser ut som "inga erbjudanden finns".
+  // The backend responds 503 if it can't reach the database. Then we should show
+  // an error, not an empty list – an empty list looks like "there are no offers".
   if (!response.ok) {
-    throw new Error(`Backend svarade ${response.status}`)
+    throw new Error(`Backend responded ${response.status}`)
   }
 
   const offers: Offer[] = await response.json()
 
-  // En äldre backend skickar inga genrer. Då behandlar vi dem som tomma i
-  // stället för att låta sidan krascha när någon filtrerar på genre.
-  // Samma sak för slutdatum: saknas fältet betyder det "okänt".
+  // An older backend sends no genres. We then treat them as empty instead
+  // of letting the page crash when someone filters on genre.
+  // Same for the end date: a missing field means "unknown".
   return offers.map((offer) => ({
     ...offer,
     genres: offer.genres ?? [],
@@ -28,13 +28,13 @@ export async function fetchOffers(): Promise<Offer[]> {
   }))
 }
 
-// Hämtar spelen som alltid är gratis. Backend sorterar dem redan med de
-// mest spelade först.
+// Fetches the games that are always free. The backend already sorts them
+// with the most played first.
 export async function fetchFreeGames(): Promise<FreeGame[]> {
   const response = await fetch(`${API_URL}/free-games`)
 
   if (!response.ok) {
-    throw new Error(`Backend svarade ${response.status}`)
+    throw new Error(`Backend responded ${response.status}`)
   }
 
   const games: FreeGame[] = await response.json()
@@ -46,20 +46,20 @@ export type Health =
   | { state: 'ok' }
   | { state: 'error'; message: string }
 
-// Kollar att backend och databasen svarar. Visas i sidhuvudet.
+// Checks that the backend and the database respond. Shown in the header.
 export async function fetchHealth(): Promise<Health> {
   try {
     const response = await fetch(`${API_URL}/health`)
     const data = await response.json()
 
-    // Servern svarade, men kunde inte nå databasen.
+    // The server responded, but couldn't reach the database.
     if (!response.ok) {
-      return { state: 'error', message: data.detail ?? 'Okänt fel' }
+      return { state: 'error', message: data.detail ?? 'Unknown error' }
     }
 
     return { state: 'ok' }
   } catch (error) {
-    // Kom inte fram till backend alls – servern är nere eller CORS blockerar.
+    // Couldn't reach the backend at all – the server is down or CORS is blocking.
     return { state: 'error', message: (error as Error).message }
   }
 }

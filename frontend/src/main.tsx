@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 
-// Hittar <div id="root"> i index.html och låter React ta över den rutan.
-// StrictMode är en utvecklingshjälp som varnar för vanliga misstag.
+// Finds <div id="root"> in index.html and lets React take over that element.
+// StrictMode is a development aid that warns about common mistakes.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

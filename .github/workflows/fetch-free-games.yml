@@ -1,10 +1,10 @@
-# Håller listan över alltid gratis spel (free to play) färsk.
-# Körs en gång per dygn, och kan även startas manuellt från GitHub-fliken Actions.
+# Keeps the list of always-free games (free to play) fresh.
+# Runs once a day, and can also be started manually from the Actions tab on GitHub.
 #
-# DATABASE_URL måste finnas som ett repo-secret, på samma sätt som för
+# DATABASE_URL must exist as a repo secret, the same way as for
 # fetch-offers.yml.
 
-name: Hämta free to play-spel
+name: Fetch free to play games
 
 on:
   schedule:
@@ -13,7 +13,7 @@ on:
 
 jobs:
   fetch:
-    name: Kör fetch_free_games.py
+    name: Run fetch_free_games.py
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -33,5 +33,5 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Hämta och spara spel
+      - name: Fetch and save games
         run: python -m app.fetch_free_games

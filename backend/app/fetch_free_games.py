@@ -1,12 +1,12 @@
-"""Hämtar spel som alltid är gratis (free to play) från Steam och sparar dem i databasen.
+"""Fetches games that are always free (free to play) from Steam and saves them to the database.
 
-Till skillnad från fetch_offers.py handlar det här om spel som aldrig kostar
-något, inte om tidsbegränsade erbjudanden. CheapShark listar dem inte alls,
-eftersom de saknar ordinarie pris.
+Unlike fetch_offers.py, this is about games that never cost anything, not
+time-limited offers. CheapShark doesn't list them at all, since they have
+no regular price.
 
-Körs automatiskt en gång per dygn av .github/workflows/fetch-free-games.yml.
+Runs automatically once a day via .github/workflows/fetch-free-games.yml.
 
-Kan också köras manuellt:
+Can also be run manually:
 
     cd backend
     python -m app.fetch_free_games
@@ -20,31 +20,31 @@ import time
 
 from sqlalchemy import text
 
-# Återanvänder Steam-uppslaget och titelfiltret från erbjudandehämtningen.
+# Reuses the Steam lookup and title filter from the offer fetcher.
 from app.fetch_offers import USER_AGENT, engine, looks_like_extra, steam_details
 
-# Hur många spel listan ska innehålla.
+# How many games the list should contain.
 TARGET = 150
 
-# Steams sökning, filtrerad på taggen Free to Play (113) och kategorin
-# "spel" (998, alltså inte DLC, demos eller soundtracks). Steam sorterar
-# efter relevans, vilket i praktiken betyder de mest spelade först.
+# Steam's search, filtered on the tag Free to Play (113) and the category
+# "games" (998, i.e. not DLC, demos or soundtracks). Steam sorts by
+# relevance, which in practice means the most played first.
 SEARCH = (
     "https://store.steampowered.com/search/results/"
     "?query&tags=113&category1=998&json=1&infinite=1&count=100&start={start}"
 )
 
-# Ett träffkort i sökresultatet: appens id följt av titeln.
+# A result card in the search results: the app's id followed by the title.
 RESULT = re.compile(
     r'data-ds-appid="(\d+)".*?<span class="title">(.*?)</span>', re.DOTALL
 )
 
-# Steam stryper hastigheten på appdetails, så vi tar det lugnt.
+# Steam rate-limits appdetails, so we take it easy.
 PAUSE_SECONDS = 0.5
 
 
 def search_candidates(pages: int = 3) -> list[tuple[str, str]]:
-    """Returnerar (app-id, titel) för de populäraste free to play-spelen, mest spelade först."""
+    """Returns (app id, title) for the most popular free to play games, most played first."""
     found: dict[str, str] = {}
 
     for page in range(pages):
@@ -61,7 +61,7 @@ def search_candidates(pages: int = 3) -> list[tuple[str, str]]:
 
 
 def collect() -> list[dict]:
-    """Bekräftar kandidaterna hos Steam och stannar när vi har TARGET spel."""
+    """Confirms the candidates with Steam and stops once we have TARGET games."""
     rows: list[dict] = []
 
     for rank, (app_id, title) in enumerate(search_candidates(), start=1):
@@ -74,9 +74,9 @@ def collect() -> list[dict]:
         details = steam_details(app_id)
         time.sleep(PAUSE_SECONDS)
 
-        # Steams eget svar avgör: ett riktigt spel som är gratis för alltid.
-        # is_free skiljer free to play från ett spel som bara delas ut gratis
-        # en kort stund.
+        # Steam's own answer decides: a real game that is free forever.
+        # is_free distinguishes free to play from a game that is only given
+        # away for free for a short while.
         if details is None or details["type"] != "game" or not details["is_free"]:
             continue
 
@@ -93,13 +93,13 @@ def collect() -> list[dict]:
     return rows
 
 
-# steam_app_id är UNIQUE. Finns spelet redan uppdateras raden.
+# steam_app_id is UNIQUE. If the game already exists, the row is updated.
 UPSERT = text("""
     INSERT INTO free_games (steam_app_id, title, genres, rank, claim_url, fetched_at)
     VALUES (:steam_app_id, :title, :genres, :rank, :claim_url, now())
     ON CONFLICT (steam_app_id) DO UPDATE SET
         title      = EXCLUDED.title,
-        -- Misslyckades genreuppslaget behåller vi de genrer vi redan har.
+        -- If the genre lookup failed we keep the genres we already have.
         genres     = CASE WHEN EXCLUDED.genres = '{}' THEN free_games.genres
                           ELSE EXCLUDED.genres END,
         rank       = EXCLUDED.rank,
@@ -109,7 +109,7 @@ UPSERT = text("""
 
 
 def save(rows: list[dict]) -> int:
-    """Sparar raderna och tar bort spel som inte längre finns med. Allt eller inget."""
+    """Saves the rows and removes games that are no longer included. All or nothing."""
     with engine.begin() as connection:
         connection.execute(UPSERT, rows)
         result = connection.execute(
@@ -121,19 +121,19 @@ def save(rows: list[dict]) -> int:
 
 
 def main() -> None:
-    print("Hämtar free to play-spel från Steam…")
+    print("Fetching free to play games from Steam…")
     rows = collect()
-    print(f"  {len(rows)} spel bekräftade")
+    print(f"  {len(rows)} games confirmed")
 
-    # Tom lista betyder att hämtningen gick fel. Rör då ingenting.
+    # An empty list means the fetch went wrong. Don't touch anything.
     if not rows:
-        raise SystemExit("Inga spel hittades – databasen lämnas orörd.")
+        raise SystemExit("No games found – leaving the database untouched.")
 
     removed = save(rows)
     if removed:
-        print(f"  {removed} spel borttagna")
+        print(f"  {removed} games removed")
 
-    print(f"Sparade {len(rows)} spel, varav {sum(1 for r in rows if r['genres'])} har genre.")
+    print(f"Saved {len(rows)} games, of which {sum(1 for r in rows if r['genres'])} have a genre.")
 
 
 if __name__ == "__main__":

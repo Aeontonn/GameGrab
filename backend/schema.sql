@@ -1,65 +1,65 @@
--- Tabellen som håller gratis- och rabatterbjudanden.
--- Körs om vid behov: IF NOT EXISTS gör att den aldrig skriver över befintlig data.
+-- The table that holds free and discounted offers.
+-- Safe to re-run: IF NOT EXISTS means it never overwrites existing data.
 
 CREATE TABLE IF NOT EXISTS offers (
     id              SERIAL PRIMARY KEY,
 
-    -- CheapSharks eget id för erbjudandet. UNIQUE gör att samma erbjudande
-    -- bara kan finnas en gång, så en ny hämtning uppdaterar i stället för att dubblera.
+    -- CheapShark's own id for the offer. UNIQUE means the same offer can
+    -- only exist once, so a new fetch updates instead of duplicating.
     deal_id         TEXT UNIQUE NOT NULL,
 
     title           TEXT NOT NULL,
 
-    -- Steam, GOG eller Epic Games. Det frontend filtrerar på.
+    -- Steam, GOG or Epic Games. What the frontend filters on.
     store           TEXT NOT NULL,
 
-    -- Priser i dollar, som CheapShark lämnar dem.
+    -- Prices in dollars, as CheapShark provides them.
     normal_price    NUMERIC(10, 2) NOT NULL,
     sale_price      NUMERIC(10, 2) NOT NULL,
 
-    -- Rabatt i procent. 100 betyder att spelet är gratis just nu.
+    -- Discount in percent. 100 means the game is free right now.
     savings         NUMERIC(5, 2) NOT NULL,
     is_free         BOOLEAN NOT NULL,
 
-    -- Bild på spelet.
+    -- Image of the game.
     thumb           TEXT,
 
-    -- Finns spelet på Steam kan vi bygga en direktlänk till butikssidan.
-    -- Saknas för erbjudanden i andra butiker.
+    -- If the game is on Steam we can build a direct link to the store page.
+    -- Missing for offers in other stores.
     steam_app_id    TEXT,
 
     claim_url       TEXT NOT NULL,
 
-    -- Spelets genrer enligt Steam, på engelska. Tom lista om Steam inte känner till spelet.
+    -- The game's genres according to Steam, in English. Empty list if Steam doesn't know the game.
     genres          TEXT[] NOT NULL DEFAULT '{}',
 
-    -- När erbjudandet går ut, enligt butiken själv. NULL om butiken inte uppger något.
+    -- When the offer expires, according to the store itself. NULL if the store doesn't say.
     ends_at         TIMESTAMPTZ,
 
-    -- När raden senast hämtades. Visar hur färsk datan är.
+    -- When the row was last fetched. Shows how fresh the data is.
     fetched_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Frontend filtrerar på butik och sorterar på rabatt, så de kolumnerna får index.
+-- The frontend filters on store and sorts on discount, so those columns get indexes.
 CREATE INDEX IF NOT EXISTS offers_store_idx ON offers (store);
 CREATE INDEX IF NOT EXISTS offers_savings_idx ON offers (savings DESC);
 
--- Lägger till genrer i en tabell som skapades innan kolumnen fanns.
--- Befintliga rader får en tom lista tills nästa hämtning fyller i dem.
+-- Adds genres to a table that was created before the column existed.
+-- Existing rows get an empty list until the next fetch fills them in.
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS genres TEXT[] NOT NULL DEFAULT '{}';
 
--- När erbjudandet går ut, enligt butiken själv. NULL om butiken inte uppger något.
+-- When the offer expires, according to the store itself. NULL if the store doesn't say.
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ;
 
--- Spel som alltid är gratis (free to play), separat från tidsbegränsade
--- erbjudanden i offers. Fylls av fetch_free_games.py.
+-- Games that are always free (free to play), separate from the time-limited
+-- offers in offers. Filled by fetch_free_games.py.
 CREATE TABLE IF NOT EXISTS free_games (
     id              SERIAL PRIMARY KEY,
     steam_app_id    TEXT UNIQUE NOT NULL,
     title           TEXT NOT NULL,
     genres          TEXT[] NOT NULL DEFAULT '{}',
 
-    -- Plats i listan, 1 = mest spelad. Behåller Steams ordning.
+    -- Position in the list, 1 = most played. Keeps Steam's order.
     rank            INTEGER NOT NULL,
 
     claim_url       TEXT NOT NULL,
