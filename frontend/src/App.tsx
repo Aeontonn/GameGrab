@@ -44,10 +44,14 @@ function OfferCard({ offer }: { offer: Offer }) {
 
       <p className="price">
         {offer.is_free ? (
-          <strong>Free right now</strong>
+          <>
+            <s>${offer.normal_price.toFixed(2)}</s>{' '}
+            <strong>Free right now</strong>
+          </>
         ) : (
           <>
-            <s>${offer.normal_price.toFixed(2)}</s> ${offer.sale_price.toFixed(2)}
+            <s>${offer.normal_price.toFixed(2)}</s>{' '}
+            ${offer.sale_price.toFixed(2)}
           </>
         )}{' '}
         <span className="savings">−{Math.round(offer.savings)}%</span>
