@@ -207,7 +207,7 @@ The backend needs `DATABASE_URL` as an environment variable on Render to be able
 
 For the job to reach the database, the repo secret `DATABASE_URL` must exist under **Settings → Secrets and variables → Actions** on GitHub and point to the same database the backend uses.
 
-The `/offers` endpoint hides offers older than `STALE_AFTER_HOURS` hours (default 6) so that a missed scheduled job doesn't show offers that may have expired at the store.
+Each run removes offers that are no longer listed on CheapShark, so the database always holds the result of the latest successful fetch. `/offers` shows that snapshot even if a scheduled run is delayed, and hides offers whose end date has passed.
 
 It also only shows free games and offers with at least `MIN_SAVINGS_PERCENT` percent off (default 80). Smaller discounts are saved in the database but not returned.
 
