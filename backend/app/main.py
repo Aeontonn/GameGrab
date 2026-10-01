@@ -17,14 +17,6 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set in backend/.env")
 
-# Offers are scheduled to be fetched every hour (see .github/workflows/fetch-offers.yml),
-# but GitHub delays scheduled runs heavily – gaps of 4–7 hours are normal. If a
-# row stays much longer than that, the fetch has probably stopped running, and
-# the offer may already have expired at the store – better to hide it than show
-# something that may no longer be true. Offers with a known end date are hidden
-# as soon as it passes regardless.
-STALE_AFTER_HOURS = float(os.getenv("STALE_AFTER_HOURS", "12"))
-
 # GameGrab only shows real bargains: free games and at least 80% off.
 # Smaller discounts stay in the database but are never returned.
 MIN_SAVINGS_PERCENT = float(os.getenv("MIN_SAVINGS_PERCENT", "80"))
@@ -65,8 +57,13 @@ def health():
     return {"status": "ok", "database": "connected"}
 
 
-# The offers the frontend renders: fresh, not expired, and either free or at least 80 percent off.
+# The offers the frontend renders: not expired, and either free or at least 80 percent off.
 # Free first, then biggest discount – the most tempting at the top.
+#
+# No freshness check on fetched_at: fetch_offers.py removes every offer that is
+# no longer on CheapShark, so the table always holds the latest successful
+# fetch. If the fetch is delayed (GitHub often runs it hours late) we keep
+# showing that snapshot instead of an empty page.
 @app.get("/offers")
 def offers():
     try:
@@ -76,15 +73,11 @@ def offers():
                     SELECT id, title, store, normal_price, sale_price, savings,
                            is_free, thumb, steam_app_id, claim_url, genres, ends_at, fetched_at
                     FROM offers
-                    WHERE fetched_at > now() - (:stale_after_hours * interval '1 hour')
-                      AND (is_free OR savings >= :min_savings)
+                    WHERE (is_free OR savings >= :min_savings)
                       AND (ends_at IS NULL OR ends_at > now())
                     ORDER BY is_free DESC, savings DESC
                 """),
-                {
-                    "stale_after_hours": STALE_AFTER_HOURS,
-                    "min_savings": MIN_SAVINGS_PERCENT,
-                },
+                {"min_savings": MIN_SAVINGS_PERCENT},
             ).mappings().all()
     except SQLAlchemyError as exc:
         # Same error handling as /health: if we couldn't reach the database
