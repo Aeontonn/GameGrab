@@ -17,11 +17,13 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set in backend/.env")
 
-# Offers are fetched every 3 hours (see .github/workflows/fetch-offers.yml).
-# If a row stays longer than that, the fetch has probably stopped running, and
+# Offers are scheduled to be fetched every hour (see .github/workflows/fetch-offers.yml),
+# but GitHub delays scheduled runs heavily – gaps of 4–7 hours are normal. If a
+# row stays much longer than that, the fetch has probably stopped running, and
 # the offer may already have expired at the store – better to hide it than show
-# something that may no longer be true.
-STALE_AFTER_HOURS = float(os.getenv("STALE_AFTER_HOURS", "6"))
+# something that may no longer be true. Offers with a known end date are hidden
+# as soon as it passes regardless.
+STALE_AFTER_HOURS = float(os.getenv("STALE_AFTER_HOURS", "12"))
 
 # GameGrab only shows real bargains: free games and at least 80% off.
 # Smaller discounts stay in the database but are never returned.
