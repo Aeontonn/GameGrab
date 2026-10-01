@@ -1,5 +1,5 @@
 # Keeps the offers in the database fresh.
-# Runs automatically every 3 hours, and can also be started manually from
+# Scheduled every hour (GitHub often delays it by several hours), and can also be started manually from
 # the Actions tab on GitHub.
 #
 # DATABASE_URL must exist as a repo secret (Settings → Secrets and
