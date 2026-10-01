@@ -10,7 +10,7 @@ name: Fetch offers
 
 on:
   schedule:
-    - cron: "0 */1 * * *"
+    - cron: "17 * * * *"
   workflow_dispatch: {}
 
 jobs:
