@@ -42,6 +42,10 @@ function OfferCard({ offer }: { offer: Offer }) {
 
       {offer.genres.length > 0 && <p className="genres">{offer.genres.join(' · ')}</p>}
 
+      {offer.description && (
+        <p className="description">{offer.description}</p>
+      )}
+
       <p className="price">
         {offer.is_free ? (
           <strong>Free right now</strong>

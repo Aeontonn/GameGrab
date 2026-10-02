@@ -88,7 +88,7 @@ def steam_details(app_id: str) -> dict | None:
     """
     url = (
         "https://store.steampowered.com/api/appdetails"
-        f"?appids={app_id}&filters=basic,genres&l=english"
+        f"?appids={app_id}&filters=basic,genres,short_description&l=english"
     )
 
     try:
@@ -109,6 +109,7 @@ def steam_details(app_id: str) -> dict | None:
             for genre in data.get("genres", [])
             if genre["id"] in GAME_GENRE_IDS
         ],
+        "description": data.get("short_description"),
     }
 
 
@@ -197,7 +198,7 @@ def gog_details(title: str) -> dict | None:
     return {"type": kind, "is_free": False, "genres": genres}
 
 
-def classify(deal: dict) -> tuple[bool, list[str]]:
+def classify(deal: dict) -> tuple[bool, list[str], str | None]:
     """Should the offer be sent to the frontend, and which genres does the game have?
 
     The title is checked first since it's free. Only what survives costs
@@ -206,7 +207,7 @@ def classify(deal: dict) -> tuple[bool, list[str]]:
     when the sale is on GOG or Epic. Without a Steam id, GOG's catalog takes over.
     """
     if looks_like_extra(deal["title"]):
-        return False, []
+        return False, [], None
 
     app_id = deal.get("steamAppID")
 
@@ -219,9 +220,13 @@ def classify(deal: dict) -> tuple[bool, list[str]]:
     # If neither responded we'd rather keep the row than lose a real
     # game. The game is then shown without a genre.
     if details is None:
-        return True, []
+        return True, [], None
 
-    return details["type"] == "game", details["genres"]
+    return (
+    details["type"] == "game",
+    details["genres"],
+    details.get("description"),
+)
 
 
 # We only show free games and offers with at least this much discount (same
@@ -386,7 +391,11 @@ def collect() -> list[dict]:
     return list(deals.values())
 
 
-def to_row(deal: dict, genres: list[str]) -> dict:
+def to_row(
+    deal: dict,
+    genres: list[str],
+    description: str | None,
+) -> dict:
     """Translates CheapShark's field names to our column names."""
     steam_app_id = deal.get("steamAppID")
     store = STORES[deal["storeID"]]
@@ -418,6 +427,7 @@ def to_row(deal: dict, genres: list[str]) -> dict:
         "steam_app_id": steam_app_id,
         "claim_url": claim_url,
         "genres": genres,
+        "description": description,
         # Filled in by add_end_dates. None means the end date is unknown.
         "ends_at": None,
     }
@@ -428,11 +438,11 @@ def to_row(deal: dict, genres: list[str]) -> dict:
 UPSERT = text("""
     INSERT INTO offers (
         deal_id, title, store, normal_price, sale_price,
-        savings, is_free, thumb, steam_app_id, claim_url, genres, ends_at, fetched_at
-    )
+        savings, is_free, thumb, steam_app_id, claim_url, genres, description, ends_at, fetched_at
+)
     VALUES (
         :deal_id, :title, :store, :normal_price, :sale_price,
-        :savings, :is_free, :thumb, :steam_app_id, :claim_url, :genres, :ends_at, now()
+        :savings, :is_free, :thumb, :steam_app_id, :claim_url, :genres, :description, :ends_at, now()
     )
     ON CONFLICT (deal_id) DO UPDATE SET
         title        = EXCLUDED.title,
@@ -450,6 +460,7 @@ UPSERT = text("""
                             ELSE EXCLUDED.genres END,
         -- Same for the end date: if the lookup fails we keep what we have.
         -- A date that has already passed is hidden by /offers anyway.
+        description  = COALESCE(EXCLUDED.description, offers.description),
         ends_at      = COALESCE(EXCLUDED.ends_at, offers.ends_at),
         fetched_at   = now()
 """)
@@ -487,9 +498,9 @@ def main() -> None:
     print("Filtering out add-ons, editions and bundles…")
     rows = []
     for deal in deals:
-        keep, genres = classify(deal)
+        keep, genres, description = classify(deal)
         if keep:
-            rows.append(to_row(deal, genres))
+            rows.append(to_row(deal, genres, description))
     print(f"  {len(deals) - len(rows)} filtered out, {len(rows)} games left")
     print(f"  {sum(1 for row in rows if row['genres'])} of them have a genre (from Steam or GOG)")
 
