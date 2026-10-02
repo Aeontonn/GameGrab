@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS offers (
     -- The game's genres according to Steam, in English. Empty list if Steam doesn't know the game.
     genres          TEXT[] NOT NULL DEFAULT '{}',
 
+    -- A short description of the game, when one is available.
+    description     TEXT,
+
     -- When the offer expires, according to the store itself. NULL if the store doesn't say.
     ends_at         TIMESTAMPTZ,
 
@@ -47,6 +50,9 @@ CREATE INDEX IF NOT EXISTS offers_savings_idx ON offers (savings DESC);
 -- Adds genres to a table that was created before the column existed.
 -- Existing rows get an empty list until the next fetch fills them in.
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS genres TEXT[] NOT NULL DEFAULT '{}';
+
+-- A short description of the game, when one is available.
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS description TEXT;
 
 -- When the offer expires, according to the store itself. NULL if the store doesn't say.
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ;

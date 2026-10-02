@@ -143,6 +143,18 @@ aside button:disabled {
   color: var(--text-dim);
 }
 
+.description {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-dim);
+
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .price {
   margin: 0 0 8px;
   color: var(--text-dim);

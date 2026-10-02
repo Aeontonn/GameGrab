@@ -23,6 +23,9 @@ export type Offer = {
   // The game's genres according to Steam, in English. Empty list if Steam doesn't know the game.
   genres: string[]
 
+  // A short description of the game. Missing when no description was found.
+description: string | null
+
   // When the offer expires, as an ISO time. null when the store doesn't say.
   ends_at: string | null
 
