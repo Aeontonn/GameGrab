@@ -258,9 +258,10 @@ function App() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
 
+            {/* Hidden until the button does something.
             <button className="search-action" type="button">
               Filter
-            </button>
+            </button> */}
           </div>
 
           <p className="count">
