@@ -24,6 +24,7 @@ export async function fetchOffers(): Promise<Offer[]> {
   return offers.map((offer) => ({
     ...offer,
     genres: offer.genres ?? [],
+    description: offer.description ?? null,
     ends_at: offer.ends_at ?? null,
   }))
 }
