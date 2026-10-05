@@ -253,7 +253,19 @@ function App() {
         <main>
           <h2>Free and on sale</h2>
           <div className="search-bar">
-            <span className="search-icon">⌕</span>
+            <span className="search-icon">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+              >
+                <circle cx="10.5" cy="10.5" r="7.5" />
+                <line x1="16" y1="16" x2="22.5" y2="22.5" />
+              </svg>
+            </span>
 
             <input
               type="search"
