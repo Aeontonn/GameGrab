@@ -191,6 +191,31 @@ aside button:disabled {
   border-bottom-color: var(--text);
 }
 
+/* Actions at the bottom of each offer card. */
+.offer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Secondary action for copying the offer link. */
+.share-button {
+  min-width: 72px;
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 5px 9px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.share-button:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
 .status {
   padding: 24px;
 }
