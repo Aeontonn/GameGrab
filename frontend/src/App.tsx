@@ -31,6 +31,20 @@ const ENDING_SOON_DAYS = 2
 // One offer as a card.
 function OfferCard({ offer }: { offer: Offer }) {
   const left = timeLeft(offer.ends_at)
+  const [copied, setCopied] = useState(false)
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(offer.claim_url)
+      setCopied(true)
+
+      setTimeout(() => {
+        setCopied(false)
+      }, 2000)
+    } catch (error) {
+      console.error('Could not copy link:', error)
+    }
+  }
 
   return (
     <li>
@@ -63,10 +77,20 @@ function OfferCard({ offer }: { offer: Offer }) {
 
       {left && <p className="time-left">{left}</p>}
 
-      {/* Leaves the site, so we open in a new tab. */}
-      <a href={offer.claim_url} target="_blank" rel="noopener noreferrer">
-        Get it on {offer.store} →
-      </a>
+      <div className="offer-actions">
+        {/* Leaves the site, so we open in a new tab. */}
+        <a href={offer.claim_url} target="_blank" rel="noopener noreferrer">
+          Get it on {offer.store} →
+        </a>
+
+        <button
+          type="button"
+          className="share-button"
+          onClick={copyLink}
+        >
+          {copied ? 'Copied!' : 'Copy link'}
+        </button>
+      </div>
     </li>
   )
 }
