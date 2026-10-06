@@ -58,7 +58,9 @@ def health():
 
 
 # The offers the frontend renders: not expired, and either free or at least 80 percent off.
-# Free first, then biggest discount – the most tempting at the top.
+# Ending soonest first, so nothing about to expire gets missed. Offers where the
+# store doesn't say when they end go last. Ties (and all the offers without an
+# end date) are ordered free first, then biggest discount.
 #
 # No freshness check on fetched_at: fetch_offers.py removes every offer that is
 # no longer on CheapShark, so the table always holds the latest successful
@@ -75,7 +77,7 @@ def offers():
                     FROM offers
                     WHERE (is_free OR savings >= :min_savings)
                       AND (ends_at IS NULL OR ends_at > now())
-                    ORDER BY is_free DESC, savings DESC
+                    ORDER BY ends_at ASC NULLS LAST, is_free DESC, savings DESC
                 """),
                 {"min_savings": MIN_SAVINGS_PERCENT},
             ).mappings().all()
