@@ -165,7 +165,7 @@ function App() {
   // selected genres. An empty group doesn't filter at all.
   //
   // With "Ends within 2 days" checked, only offers with a known end date
-  // within the limit are shown, and whatever ends first is at the top.
+  // within the limit are shown. The backend already sorts by end date.
   // The limit follows what the card shows: everything shown as "2 days left"
   // or less should be included. The card rounds down, so 2 days and 8 hours
   // shows as "2 days left" – that's why the limit is one extra day.
@@ -181,9 +181,9 @@ function App() {
     if (!endingSoonOnly) return filtered
 
     const limit = openedAt + (ENDING_SOON_DAYS + 1) * 24 * 3_600_000
-    return filtered
-      .filter((offer) => offer.ends_at && new Date(offer.ends_at).getTime() < limit)
-      .sort((a, b) => new Date(a.ends_at!).getTime() - new Date(b.ends_at!).getTime())
+    return filtered.filter(
+      (offer) => offer.ends_at && new Date(offer.ends_at).getTime() < limit,
+    )
   }, [load, stores, genres, endingSoonOnly, openedAt, matchesSearch])
 
   // The genre filter also applies to "Always free". The store filter doesn't,
