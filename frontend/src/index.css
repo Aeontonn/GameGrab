@@ -33,9 +33,117 @@ h1 {
   margin: 0 0 4px;
 }
 
+/* Title on the left, the account on the right. */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
 header p {
   margin: 0 0 24px;
   color: var(--text-dim);
+}
+
+/* Login, or who is logged in. The form opens as a panel below the button. */
+.account {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.account-email {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.account button,
+.auth-form button {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.account button:hover,
+.auth-form button:hover {
+  border-color: var(--text-dim);
+}
+
+.auth-form {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 10;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+}
+
+.auth-form p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.auth-form input {
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+}
+
+.auth-form .hint {
+  margin-top: -6px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* Log in / Create account: the selected one is at full strength. */
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.auth-tabs button {
+  flex: 1;
+  color: var(--text-dim);
+}
+
+.auth-tabs button.active {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.auth-form button.primary {
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.auth-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 /* Filters on the left, list on the right. */
