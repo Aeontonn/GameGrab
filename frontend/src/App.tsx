@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Account from './Account'
 import { API_URL, fetchFreeGames, fetchOffers } from './api'
 import { STORES } from './types'
 import type { FreeGame, Offer } from './types'
@@ -217,8 +218,12 @@ function App() {
   return (
     <>
       <header>
-        <h1>GameGrab</h1>
-        <p>Free and discounted PC games, all in one place.</p>
+        <div>
+          <h1>GameGrab</h1>
+          <p>Free and discounted PC games, all in one place.</p>
+        </div>
+
+        <Account />
       </header>
 
       <div className="layout">

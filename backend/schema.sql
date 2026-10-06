@@ -71,3 +71,9 @@ CREATE TABLE IF NOT EXISTS free_games (
     claim_url       TEXT NOT NULL,
     fetched_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Row Level Security with no policies: nobody gets at the tables through
+-- Supabase's public API, even with the publishable key the frontend uses for
+-- login. The backend and the fetch scripts connect as the postgres role, which
+-- bypasses RLS, so they work as before.
+ALTER TABLE offers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE free_games ENABLE ROW LEVEL SECURITY;
