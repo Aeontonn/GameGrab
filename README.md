@@ -224,6 +224,40 @@ cd backend
 python -m app.fetch_free_games
 ```
 
+## Accounts and login
+
+Visitors can create an account and log in with email and password. It's handled
+by Supabase Auth straight from the frontend (`frontend/src/supabase.ts` and
+`frontend/src/Account.tsx`), so the backend isn't involved yet. Everything else
+on the site works without an account.
+
+The frontend needs two environment variables. Locally they go in
+`frontend/.env.local` (use `frontend/.env.example` as a template), and on Vercel
+under Environment Variables:
+
+```env
+VITE_SUPABASE_URL=https://<project>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+Both are found in Supabase under **Project Settings → API Keys**. They are not
+secret, since they end up in the visitor's browser. The secret key
+(`sb_secret_...` / `service_role`) must never be put in the frontend.
+
+The tables are protected by Row Level Security (see `backend/schema.sql`), so
+the publishable key can't be used to read or change them.
+
+Settings in the Supabase dashboard:
+
+- **Authentication → URL Configuration:** Site URL is the Vercel address.
+  Add `http://localhost:5173` under Redirect URLs, otherwise the link in the
+  confirmation email doesn't work locally.
+- **Authentication → Sign In / Providers → Email:** keep "Confirm email" on.
+- **Authentication → Policies (password):** minimum length 8, the same as the form.
+
+Supabase's built-in email sender only sends a few emails per hour and is meant
+for testing. Before launch, set up your own SMTP under **Authentication → Emails**.
+
 ## CORS
 
 During local development the backend allows requests from:
