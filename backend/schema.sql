@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS offers (
     -- A short description of the game, when one is available.
     description     TEXT,
 
+    -- PC system requirements from Steam. NULL when Steam doesn't provide them.
+    minimum_requirements TEXT,
+    recommended_requirements TEXT,
+
     -- When the offer expires, according to the store itself. NULL if the store doesn't say.
     ends_at         TIMESTAMPTZ,
 
@@ -53,6 +57,10 @@ ALTER TABLE offers ADD COLUMN IF NOT EXISTS genres TEXT[] NOT NULL DEFAULT '{}';
 
 -- A short description of the game, when one is available.
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS description TEXT;
+
+-- PC system requirements from Steam.
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS minimum_requirements TEXT;
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS recommended_requirements TEXT;
 
 -- When the offer expires, according to the store itself. NULL if the store doesn't say.
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ;

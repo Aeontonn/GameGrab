@@ -73,7 +73,7 @@ def offers():
             rows = connection.execute(
                 text("""
                     SELECT id, title, store, normal_price, sale_price, savings,
-                           is_free, thumb, steam_app_id, claim_url, genres, description, ends_at, fetched_at
+                           is_free, thumb, steam_app_id, claim_url, genres, description, minimum_requirements, recommended_requirements, ends_at, fetched_at
                     FROM offers
                     WHERE (is_free OR savings >= :min_savings)
                       AND (ends_at IS NULL OR ends_at > now())
