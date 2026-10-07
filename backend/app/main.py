@@ -58,9 +58,10 @@ def health():
 
 
 # The offers the frontend renders: not expired, and either free or at least 80 percent off.
-# Ending soonest first, so nothing about to expire gets missed. Offers where the
-# store doesn't say when they end go last. Ties (and all the offers without an
-# end date) are ordered free first, then biggest discount.
+# Biggest discount first, free games at the top. Offers with the same discount
+# as the card shows it (rounded to a whole percent) are ordered by time left, so
+# the ones about to expire come first. Offers where the store doesn't say when
+# they end go last within their discount.
 #
 # No freshness check on fetched_at: fetch_offers.py removes offers that haven't
 # been seen for 12 hours, so the table holds the latest offers it could get.
@@ -77,7 +78,7 @@ def offers():
                     FROM offers
                     WHERE (is_free OR savings >= :min_savings)
                       AND (ends_at IS NULL OR ends_at > now())
-                    ORDER BY ends_at ASC NULLS LAST, is_free DESC, savings DESC
+                    ORDER BY is_free DESC, ROUND(savings) DESC, ends_at ASC NULLS LAST, savings DESC
                 """),
                 {"min_savings": MIN_SAVINGS_PERCENT},
             ).mappings().all()

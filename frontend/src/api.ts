@@ -5,8 +5,8 @@ const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 export { API_URL }
 
-// Fetches all offers. The backend already sorts them by shortest time left
-// (no end date last), so we don't need to re-sort here.
+// Fetches all offers. The backend already sorts them by biggest discount,
+// then shortest time left (no end date last), so we don't need to re-sort here.
 export async function fetchOffers(): Promise<Offer[]> {
   const response = await fetch(`${API_URL}/offers`)
 
