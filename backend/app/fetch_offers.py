@@ -12,6 +12,7 @@ Can also be run manually, e.g. to test a change:
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 import re
@@ -410,38 +411,120 @@ def add_end_dates(rows: list[dict]) -> None:
             row["ends_at"] = gog_end_date(row["title"])
 
 
+# Longest block (seconds) we are willing to sit out inside one run.
+MAX_WAIT = 120
+
+
 def fetch_page(**params) -> list[dict]:
-    """Sends one query to CheapShark and returns the response as a list."""
+    """Sends one query to CheapShark and returns the response as a list.
+
+    CheapShark answers 429 when we go too fast, so we back off and try again.
+    If it still fails we raise instead of returning a partial result, so
+    nothing is saved and the cursor doesn't move.
+    """
     url = f"{API}?{urlencode(params)}"
     request = Request(url, headers={"User-Agent": USER_AGENT})
 
-    with urlopen(request, timeout=30) as response:
-        return json.load(response)
+    for attempt in range(5):
+        try:
+            with urlopen(request, timeout=30) as response:
+                return json.load(response)
+        except HTTPError as error:
+            if error.code not in (400, 429, 500, 502, 503) or attempt == 4:
+                raise
+
+            # When blocked, CheapShark says how long in Retry-After (seconds).
+            # A short wait is worth sitting out; a long one (it can be nearly
+            # an hour) is not – better to stop now and let the next run try.
+            retry_after = error.headers.get("Retry-After")
+            if retry_after and retry_after.isdigit():
+                if int(retry_after) > MAX_WAIT:
+                    raise RuntimeError(
+                        f"CheapShark has blocked us for {retry_after} seconds "
+                        "(rate limit). Nothing was changed; try again later."
+                    ) from error
+                time.sleep(int(retry_after) + 1)
+            else:
+                time.sleep(10 * 2**attempt)
 
 
-def collect() -> list[dict]:
-    """Collects offers from CheapShark.
+# CheapShark allows at most 60 deals per page.
+PAGE_SIZE = 60
+
+# Each run only fetches this many pages, then picks up where it left off next
+# time. A full pass over the list is spread over several runs, so we never send
+# a burst of requests large enough for CheapShark to block us. Together with
+# the free-games request that is 9 requests per run.
+PAGES_PER_RUN = 8
+
+# Be polite to CheapShark between requests.
+PAGE_PAUSE = 3
+
+
+def load_cursor() -> int:
+    """Which page of CheapShark's list the previous run stopped at (0 = start)."""
+    with engine.connect() as connection:
+        value = connection.execute(
+            text("SELECT value FROM fetch_state WHERE key = 'deals_page'")
+        ).scalar()
+    return value or 0
+
+
+def save_cursor(page: int) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO fetch_state (key, value) VALUES ('deals_page', :page) "
+                "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
+            ),
+            {"page": page},
+        )
+
+
+def collect(start_page: int) -> tuple[list[dict], int]:
+    """Collects offers from CheapShark, a few pages at a time.
 
     Two kinds of requests, since the site is about both free and discounted:
-    the top-rated deals, plus everything that is completely free right now.
+    PAGES_PER_RUN pages of deals with at least MIN_SHOWN_SAVINGS percent off,
+    starting at start_page, plus everything that is completely free right now.
+
+    Returns the deals and the page the next run should start at.
     """
     store_ids = ",".join(STORES)
     deals: dict[str, dict] = {}
+    next_page = start_page + PAGES_PER_RUN
 
-    # Three pages of the deals CheapShark itself ranks highest.
-    for page in range(3):
-        for deal in fetch_page(
-            storeID=store_ids, pageSize=60, pageNumber=page, sortBy="Deal Rating"
-        ):
-            deals[deal["dealID"]] = deal
+    # Biggest discount first, so the list ends where deals drop below the
+    # threshold – everything after it is smaller still.
+    for page in range(start_page, start_page + PAGES_PER_RUN):
+        batch = fetch_page(
+            storeID=store_ids,
+            pageSize=PAGE_SIZE,
+            pageNumber=page,
+            sortBy="Savings",  # biggest discount first by default; desc=1 would reverse it
+            onSale=1,
+        )
+        print(f"  page {page + 1}: {len(batch)} deals", flush=True)
+        for deal in batch:
+            if float(deal["savings"]) >= MIN_SHOWN_SAVINGS:
+                deals[deal["dealID"]] = deal
 
-    # Everything that costs zero right now. Collected separately, otherwise
-    # they risk falling outside the three pages above.
-    for deal in fetch_page(storeID=store_ids, pageSize=60, upperPrice=0):
+        reached_end = len(batch) < PAGE_SIZE or any(
+            float(deal["savings"]) < MIN_SHOWN_SAVINGS for deal in batch
+        )
+        if reached_end:
+            # Reached the end of the list: the next run starts over.
+            next_page = 0
+            break
+        time.sleep(PAGE_PAUSE)
+
+    # Everything that costs zero right now. Fetched every run, since there are
+    # few of them and they are what visitors want most.
+    for deal in fetch_page(storeID=store_ids, pageSize=PAGE_SIZE, upperPrice=0):
         deals[deal["dealID"]] = deal
 
     # The key is dealID, so the same offer can only appear once.
-    return list(deals.values())
+    return list(deals.values()), next_page
 
 
 def to_row(
@@ -537,32 +620,122 @@ def save(rows: list[dict]) -> None:
         connection.execute(UPSERT, rows)
 
 
-def remove_stale(keep: list[str]) -> int:
-    """Removes rows that no longer exist on CheapShark.
+# An offer stays until it hasn't been seen for this long. A run only covers part
+# of the list, so "not in this run" says nothing – but a full pass takes a few
+# hours, so an offer nobody has refreshed for this long has ended.
+STALE_AFTER_HOURS = 12
+
+
+def remove_stale() -> int:
+    """Removes offers that haven't been seen for STALE_AFTER_HOURS.
 
     Without this, an offer that has ended would stay forever and be shown
     as active – the worst thing a site like this can do.
     """
-    if not keep:
-        # An empty list means the fetch went wrong. Don't touch anything.
-        return 0
-
     with engine.begin() as connection:
         result = connection.execute(
-            text("DELETE FROM offers WHERE deal_id <> ALL(:keep)"), {"keep": keep}
+            text("DELETE FROM offers WHERE fetched_at < now() - make_interval(hours => :hours)"),
+            {"hours": STALE_AFTER_HOURS},
         )
 
     return result.rowcount
 
 
+# Looking up a game costs a request to Steam or GOG, and a game's genres and
+# requirements don't change. So only deals we haven't seen before are looked up;
+# everything else is reused from the database.
+#
+# Steam allows roughly 200 appdetails requests per five minutes. To stay under
+# that, at most MAX_NEW_LOOKUPS new deals are looked up per run. The rest are
+# skipped and picked up by the next run, which is how a big first run catches up.
+MAX_NEW_LOOKUPS = 150
+LOOKUP_PAUSE = 1.5
+
+
+def load_cache() -> tuple[dict[str, dict], set[str]]:
+    """Returns what we already know: looked-up details per deal, and deals that aren't games."""
+    with engine.connect() as connection:
+        known = {
+            row["deal_id"]: dict(row)
+            for row in connection.execute(
+                text("""
+                    SELECT deal_id, genres, description,
+                           minimum_requirements, recommended_requirements
+                    FROM offers
+                    WHERE description IS NOT NULL OR genres <> '{}'
+                """)
+            ).mappings()
+        }
+        skipped = {
+            row[0]
+            for row in connection.execute(text("SELECT deal_id FROM skipped_deals"))
+        }
+    return known, skipped
+
+
+def remember_skipped(deal_ids: list[str]) -> None:
+    """Remembers deals that Steam or GOG said are not games, so we don't ask again."""
+    if not deal_ids:
+        return
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO skipped_deals (deal_id) VALUES (:deal_id) "
+                "ON CONFLICT DO NOTHING"
+            ),
+            [{"deal_id": deal_id} for deal_id in deal_ids],
+        )
+
+
+def forget_old_skipped() -> None:
+    """Drops old skipped deals, so the table doesn't grow forever.
+
+    Forgetting is harmless: a deal that is still on sale is simply looked up
+    and skipped again.
+    """
+    with engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM skipped_deals WHERE created_at < now() - interval '14 days'")
+        )
+
+
 def main() -> None:
     print("Fetching from CheapShark…")
-    deals = collect()
+    start_page = load_cursor()
+    print(f"  starting at page {start_page + 1}")
+    deals, next_page = collect(start_page)
     print(f"  {len(deals)} offers fetched")
 
     print("Filtering out add-ons, editions and bundles…")
+    known, skipped = load_cache()
     rows = []
+    new_skipped = []
+    lookups = 0
+    deferred = 0
     for deal in deals:
+        deal_id = deal["dealID"]
+
+        if deal_id in skipped or looks_like_extra(deal["title"]):
+            continue
+
+        cached = known.get(deal_id)
+        if cached:
+            rows.append(
+                to_row(
+                    deal,
+                    cached["genres"],
+                    cached["description"],
+                    cached["minimum_requirements"],
+                    cached["recommended_requirements"],
+                )
+            )
+            continue
+
+        if lookups >= MAX_NEW_LOOKUPS:
+            deferred += 1
+            continue
+        lookups += 1
+
         (
             keep,
             genres,
@@ -570,6 +743,7 @@ def main() -> None:
             minimum_requirements,
             recommended_requirements,
         ) = classify(deal)
+        time.sleep(LOOKUP_PAUSE)
 
         if keep:
             rows.append(
@@ -581,7 +755,12 @@ def main() -> None:
                     recommended_requirements,
                 )
             )
-    print(f"  {len(deals) - len(rows)} filtered out, {len(rows)} games left")
+        else:
+            new_skipped.append(deal_id)
+
+    remember_skipped(new_skipped)
+    print(f"  {lookups} new deals looked up, {deferred} left for the next run")
+    print(f"  {len(rows)} games kept")
     print(f"  {sum(1 for row in rows if row['genres'])} of them have a genre (from Steam or GOG)")
 
     print("Fetching end dates…")
@@ -590,7 +769,12 @@ def main() -> None:
 
     save(rows)
 
-    stale = remove_stale([row["deal_id"] for row in rows])
+    # Only move on once the rows are saved, so a failed run is retried
+    # from the same page.
+    save_cursor(next_page)
+    forget_old_skipped()
+
+    stale = remove_stale()
     if stale:
         print(f"  {stale} old offers removed")
 
