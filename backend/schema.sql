@@ -79,9 +79,25 @@ CREATE TABLE IF NOT EXISTS free_games (
     claim_url       TEXT NOT NULL,
     fetched_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Deals that Steam or GOG said are not games (DLC, demos, soundtracks…).
+-- Remembered so fetch_offers.py doesn't look them up again every hour.
+CREATE TABLE IF NOT EXISTS skipped_deals (
+    deal_id         TEXT PRIMARY KEY,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Where fetch_offers.py stopped in CheapShark's list, so the next run can
+-- continue from there instead of fetching everything at once.
+CREATE TABLE IF NOT EXISTS fetch_state (
+    key             TEXT PRIMARY KEY,
+    value           INTEGER NOT NULL
+);
+
 -- Row Level Security with no policies: nobody gets at the tables through
 -- Supabase's public API, even with the publishable key the frontend uses for
 -- login. The backend and the fetch scripts connect as the postgres role, which
 -- bypasses RLS, so they work as before.
 ALTER TABLE offers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE free_games ENABLE ROW LEVEL SECURITY;
+ALTER TABLE skipped_deals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fetch_state ENABLE ROW LEVEL SECURITY;

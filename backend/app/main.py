@@ -62,10 +62,10 @@ def health():
 # store doesn't say when they end go last. Ties (and all the offers without an
 # end date) are ordered free first, then biggest discount.
 #
-# No freshness check on fetched_at: fetch_offers.py removes every offer that is
-# no longer on CheapShark, so the table always holds the latest successful
-# fetch. If the fetch is delayed (GitHub often runs it hours late) we keep
-# showing that snapshot instead of an empty page.
+# No freshness check on fetched_at: fetch_offers.py removes offers that haven't
+# been seen for 12 hours, so the table holds the latest offers it could get.
+# If the fetch is delayed (GitHub often runs it hours late) we keep showing
+# that snapshot instead of an empty page.
 @app.get("/offers")
 def offers():
     try:
