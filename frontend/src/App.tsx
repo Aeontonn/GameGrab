@@ -203,7 +203,7 @@ function App() {
   // selected genres. An empty group doesn't filter at all.
   //
   // With "Ends within 2 days" checked, only offers with a known end date
-  // within the limit are shown. The backend already sorts by end date.
+  // within the limit are shown.
   // The limit follows what the card shows: everything shown as "2 days left"
   // or less should be included. The card rounds down, so 2 days and 8 hours
   // shows as "2 days left" – that's why the limit is one extra day.
