@@ -27,7 +27,6 @@ const timeLeft = (endsAt: string | null): string | null => {
 
 // The "Ends within 2 days" option shows offers that expire within this many days.
 // With 7 days nearly every offer was included, so the option said nothing.
-const ENDING_SOON_DAYS = 2
 
 const withoutRequirementLabel = (value: string): string =>
   value.replace(/^(Minimum|Recommended):\s*/i, '')
@@ -161,7 +160,7 @@ function App() {
 
   // Whether only offers ending soon should be shown. Off by default – the
   // visitor has to actively choose it.
-  const [endingSoonOnly, setEndingSoonOnly] = useState(false)
+  const [endingWithinDays, setEndingWithinDays] = useState<number | null>(null)
 
   // Runs once when the page loads: fetch the offers from the backend.
   useEffect(() => {
@@ -216,13 +215,13 @@ function App() {
         (genres.length === 0 || offer.genres.some((genre) => genres.includes(genre))) &&
         matchesSearch(offer.title),
     )
-    if (!endingSoonOnly) return filtered
+    if (endingWithinDays === null) return filtered
 
-    const limit = openedAt + (ENDING_SOON_DAYS + 1) * 24 * 3_600_000
+    const limit = openedAt + endingWithinDays * 24 * 3_600_000
     return filtered.filter(
       (offer) => offer.ends_at && new Date(offer.ends_at).getTime() < limit,
     )
-  }, [load, stores, genres, endingSoonOnly, openedAt, matchesSearch])
+  }, [load, stores, genres, endingWithinDays, openedAt, matchesSearch])
 
   // The genre filter also applies to "Always free". The store filter doesn't,
   // since nearly all of those games are on Steam.
@@ -236,7 +235,7 @@ function App() {
     [freeGames, genres, matchesSearch],
   )
 
-  const anyFilter = stores.length > 0 || genres.length > 0 || endingSoonOnly
+  const anyFilter = stores.length > 0 || genres.length > 0 || endingWithinDays !== null
 
   if (load.state === 'loading') {
     return <p className="status">Fetching offers…</p>
@@ -294,7 +293,7 @@ function App() {
             onClick={() => {
               setStores([])
               setGenres([])
-              setEndingSoonOnly(false)
+              setEndingWithinDays(null)
             }}
             disabled={!anyFilter}
           >
@@ -305,15 +304,20 @@ function App() {
               choice you make actively, not one of the regular filters. */}
           <div className="time-filter">
             <h2>Time left</h2>
-            <label className="filter-option">
-              <input
-                type="checkbox"
-                checked={endingSoonOnly}
-                onChange={() => setEndingSoonOnly((current) => !current)}
-              />
-              Ends within {ENDING_SOON_DAYS} days
-            </label>
+
+            {[1, 2, 7].map((days) => (
+              <label key={days} className="filter-option">
+                <input
+                  type="radio"
+                  name="time-left"
+                  checked={endingWithinDays === days}
+                  onChange={() => setEndingWithinDays(days)}
+                />
+                Ends within {days} {days === 1 ? 'day' : 'days'}
+              </label>
+            ))}
           </div>
+
         </aside>
 
         <main>
@@ -348,7 +352,9 @@ function App() {
 
           <p className="count">
             <strong>{visible.length}</strong>{' '}
-            {endingSoonOnly ? `offers ending within ${ENDING_SOON_DAYS} days` : 'offers'}
+            {endingWithinDays !== null
+              ? `offers ending within ${endingWithinDays} ${endingWithinDays === 1 ? 'day' : 'days'}`
+              : 'offers'}
           </p>
 
           <ul className="offers">
