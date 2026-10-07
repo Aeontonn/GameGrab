@@ -25,6 +25,8 @@ export async function fetchOffers(): Promise<Offer[]> {
     ...offer,
     genres: offer.genres ?? [],
     description: offer.description ?? null,
+    minimum_requirements: offer.minimum_requirements ?? null,
+    recommended_requirements: offer.recommended_requirements ?? null,
     ends_at: offer.ends_at ?? null,
   }))
 }
