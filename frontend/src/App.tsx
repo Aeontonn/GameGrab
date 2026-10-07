@@ -27,7 +27,6 @@ const timeLeft = (endsAt: string | null): string | null => {
 
 // The "Ends within 2 days" option shows offers that expire within this many days.
 // With 7 days nearly every offer was included, so the option said nothing.
-const ENDING_SOON_DAYS = 2
 
 const withoutRequirementLabel = (value: string): string =>
   value.replace(/^(Minimum|Recommended):\s*/i, '')
