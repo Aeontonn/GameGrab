@@ -648,8 +648,8 @@ def remove_stale() -> int:
 # Steam allows roughly 200 appdetails requests per five minutes. To stay under
 # that, at most MAX_NEW_LOOKUPS new deals are looked up per run. The rest are
 # skipped and picked up by the next run, which is how a big first run catches up.
-MAX_NEW_LOOKUPS = 150
-LOOKUP_PAUSE = 1.5
+MAX_NEW_LOOKUPS = 190
+LOOKUP_PAUSE = 1.6
 
 
 def load_cache() -> tuple[dict[str, dict], set[str]]:
