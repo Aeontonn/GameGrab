@@ -20,6 +20,7 @@ from sqlalchemy import create_engine, text
 import json
 import time
 import os
+from html import unescape
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
@@ -77,6 +78,38 @@ GAME_GENRE_IDS = {
     "29",  # Massively Multiplayer
 }
 
+def clean_steam_requirements(value: str | None) -> str | None:
+    """Converts Steam's system requirements HTML to readable plain text."""
+    if not value:
+        return None
+
+    # Turn line breaks and list items into normal text lines.
+    text = re.sub(r"<br\s*/?>", "\n", value, flags=re.IGNORECASE)
+    text = re.sub(r"</li>", "\n", text, flags=re.IGNORECASE)
+
+    # Remove the remaining HTML tags.
+    text = re.sub(r"<[^>]+>", "", text)
+
+    # Convert HTML entities such as &reg; to normal characters.
+    text = unescape(text)
+
+    # Remove empty lines and unnecessary whitespace.
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+
+    return "\n".join(lines) or None
+
+def split_steam_requirements(
+    minimum: str | None,
+    recommended: str | None,
+) -> tuple[str | None, str | None]:
+    """Separates minimum and recommended requirements when Steam combines them."""
+    if minimum and not recommended and "Recommended:" in minimum:
+        minimum_part, recommended_part = minimum.split("Recommended:", 1)
+
+        minimum = minimum_part.strip()
+        recommended = f"Recommended: {recommended_part.strip()}"
+
+    return minimum, recommended
 
 def steam_details(app_id: str) -> dict | None:
     """Asks Steam what something is (game, dlc, demo, music…) and which genres it has.
@@ -88,7 +121,7 @@ def steam_details(app_id: str) -> dict | None:
     """
     url = (
         "https://store.steampowered.com/api/appdetails"
-        f"?appids={app_id}&filters=basic,genres,short_description&l=english"
+        f"?appids={app_id}&l=english"
     )
 
     try:
@@ -101,6 +134,20 @@ def steam_details(app_id: str) -> dict | None:
         return None
 
     data = payload["data"]
+    requirements = data.get("pc_requirements") or {}
+
+    minimum_requirements = clean_steam_requirements(
+        requirements.get("minimum")
+    )
+    recommended_requirements = clean_steam_requirements(
+        requirements.get("recommended")
+    )
+
+    minimum_requirements, recommended_requirements = split_steam_requirements(
+        minimum_requirements,
+        recommended_requirements,
+    )
+
     return {
         "type": data.get("type"),
         "is_free": bool(data.get("is_free")),
@@ -110,6 +157,8 @@ def steam_details(app_id: str) -> dict | None:
             if genre["id"] in GAME_GENRE_IDS
         ],
         "description": data.get("short_description"),
+        "minimum_requirements": minimum_requirements,
+        "recommended_requirements": recommended_requirements,
     }
 
 
@@ -198,7 +247,9 @@ def gog_details(title: str) -> dict | None:
     return {"type": kind, "is_free": False, "genres": genres}
 
 
-def classify(deal: dict) -> tuple[bool, list[str], str | None]:
+def classify(
+    deal: dict,
+) -> tuple[bool, list[str], str | None, str | None, str | None]:
     """Should the offer be sent to the frontend, and which genres does the game have?
 
     The title is checked first since it's free. Only what survives costs
@@ -207,7 +258,7 @@ def classify(deal: dict) -> tuple[bool, list[str], str | None]:
     when the sale is on GOG or Epic. Without a Steam id, GOG's catalog takes over.
     """
     if looks_like_extra(deal["title"]):
-        return False, [], None
+        return False, [], None, None, None
 
     app_id = deal.get("steamAppID")
 
@@ -220,12 +271,14 @@ def classify(deal: dict) -> tuple[bool, list[str], str | None]:
     # If neither responded we'd rather keep the row than lose a real
     # game. The game is then shown without a genre.
     if details is None:
-        return True, [], None
+        return True, [], None, None, None
 
     return (
-    details["type"] == "game",
-    details["genres"],
-    details.get("description"),
+        details["type"] == "game",
+        details["genres"],
+        details.get("description"),
+        details.get("minimum_requirements"),
+        details.get("recommended_requirements"),
 )
 
 
@@ -395,6 +448,8 @@ def to_row(
     deal: dict,
     genres: list[str],
     description: str | None,
+    minimum_requirements: str | None,
+    recommended_requirements: str | None,
 ) -> dict:
     """Translates CheapShark's field names to our column names."""
     steam_app_id = deal.get("steamAppID")
@@ -428,6 +483,8 @@ def to_row(
         "claim_url": claim_url,
         "genres": genres,
         "description": description,
+        "minimum_requirements": minimum_requirements,
+        "recommended_requirements": recommended_requirements,
         # Filled in by add_end_dates. None means the end date is unknown.
         "ends_at": None,
     }
@@ -438,11 +495,11 @@ def to_row(
 UPSERT = text("""
     INSERT INTO offers (
         deal_id, title, store, normal_price, sale_price,
-        savings, is_free, thumb, steam_app_id, claim_url, genres, description, ends_at, fetched_at
+        savings, is_free, thumb, steam_app_id, claim_url, genres, description, minimum_requirements, recommended_requirements, ends_at, fetched_at
 )
     VALUES (
         :deal_id, :title, :store, :normal_price, :sale_price,
-        :savings, :is_free, :thumb, :steam_app_id, :claim_url, :genres, :description, :ends_at, now()
+        :savings, :is_free, :thumb, :steam_app_id, :claim_url, :genres, :description, :minimum_requirements, :recommended_requirements, :ends_at, now()
     )
     ON CONFLICT (deal_id) DO UPDATE SET
         title        = EXCLUDED.title,
@@ -460,7 +517,15 @@ UPSERT = text("""
                             ELSE EXCLUDED.genres END,
         -- Same for the end date: if the lookup fails we keep what we have.
         -- A date that has already passed is hidden by /offers anyway.
-        description  = COALESCE(EXCLUDED.description, offers.description),
+        description = COALESCE(EXCLUDED.description, offers.description),
+        minimum_requirements = COALESCE(
+            EXCLUDED.minimum_requirements,
+            offers.minimum_requirements
+        ),
+        recommended_requirements = COALESCE(
+            EXCLUDED.recommended_requirements,
+            offers.recommended_requirements
+        ),
         ends_at      = COALESCE(EXCLUDED.ends_at, offers.ends_at),
         fetched_at   = now()
 """)
@@ -498,9 +563,24 @@ def main() -> None:
     print("Filtering out add-ons, editions and bundles…")
     rows = []
     for deal in deals:
-        keep, genres, description = classify(deal)
+        (
+            keep,
+            genres,
+            description,
+            minimum_requirements,
+            recommended_requirements,
+        ) = classify(deal)
+
         if keep:
-            rows.append(to_row(deal, genres, description))
+            rows.append(
+                to_row(
+                    deal,
+                    genres,
+                    description,
+                    minimum_requirements,
+                    recommended_requirements,
+                )
+            )
     print(f"  {len(deals) - len(rows)} filtered out, {len(rows)} games left")
     print(f"  {sum(1 for row in rows if row['genres'])} of them have a genre (from Steam or GOG)")
 

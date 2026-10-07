@@ -29,10 +29,14 @@ const timeLeft = (endsAt: string | null): string | null => {
 // With 7 days nearly every offer was included, so the option said nothing.
 const ENDING_SOON_DAYS = 2
 
+const withoutRequirementLabel = (value: string): string =>
+  value.replace(/^(Minimum|Recommended):\s*/i, '')
+
 // One offer as a card.
 function OfferCard({ offer }: { offer: Offer }) {
   const left = timeLeft(offer.ends_at)
   const [copied, setCopied] = useState(false)
+  const [requirementsOpen, setRequirementsOpen] = useState(false)
 
   const copyLink = async () => {
     try {
@@ -59,6 +63,39 @@ function OfferCard({ offer }: { offer: Offer }) {
 
       {offer.description && (
         <p className="description">{offer.description}</p>
+      )}
+
+      {(offer.minimum_requirements || offer.recommended_requirements) && (
+        <div className="system-requirements">
+          <button
+            type="button"
+            className="requirements-button"
+            onClick={() => setRequirementsOpen((current) => !current)}
+            aria-expanded={requirementsOpen}
+          >
+
+            <span>System requirements</span>
+            <span aria-hidden="true">{requirementsOpen ? '−' : '+'}</span>
+          </button>
+
+          {requirementsOpen && (
+            <div className="requirements-content">
+              {offer.minimum_requirements && (
+                <div>
+                  <h4>Minimum</h4>
+                  <p>{withoutRequirementLabel(offer.minimum_requirements)}</p>
+                </div>
+              )}
+
+              {offer.recommended_requirements && (
+                <div>
+                  <h4>Recommended</h4>
+                  <p>{withoutRequirementLabel(offer.recommended_requirements)}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       <p className="price">
