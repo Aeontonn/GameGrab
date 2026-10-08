@@ -79,6 +79,29 @@ GAME_GENRE_IDS = {
     "29",  # Massively Multiplayer
 }
 
+# Steam's own adult markers. Descriptor 3 is "Adult Only Sexual Content", which
+# Steam requires for sexual games such as hentai. Genre 71 is "Sexual Content".
+# Mature-but-not-sexual games (GTA, Witcher…) only get descriptors 1, 2 and 5
+# ("Some Nudity", violence, general mature), so they are not caught.
+ADULT_DESCRIPTOR_IDS = {3}
+ADULT_GENRE_IDS = {"71"}
+
+
+def is_adult(data: dict) -> bool:
+    """True if Steam marks the game as sexual/adult-only content."""
+    descriptors = (data.get("content_descriptors") or {}).get("ids") or []
+    if ADULT_DESCRIPTOR_IDS.intersection(descriptors):
+        return True
+    return any(genre["id"] in ADULT_GENRE_IDS for genre in data.get("genres", []))
+
+
+# Steam lists third-party launchers/accounts a game needs besides Steam itself,
+# e.g. "Ubisoft Connect launcher (Supports Linking to Steam Account)".
+def launcher_notice(data: dict) -> str | None:
+    """The extra launcher the game needs on top of the store's own, if any."""
+    return (data.get("ext_user_account_notice") or "").strip() or None
+
+
 def clean_steam_requirements(value: str | None) -> str | None:
     """Converts Steam's system requirements HTML to readable plain text."""
     if not value:
@@ -152,6 +175,8 @@ def steam_details(app_id: str) -> dict | None:
     return {
         "type": data.get("type"),
         "is_free": bool(data.get("is_free")),
+        "adult": is_adult(data),
+        "launcher_notice": launcher_notice(data),
         "genres": [
             genre["description"]
             for genre in data.get("genres", [])
@@ -250,7 +275,7 @@ def gog_details(title: str) -> dict | None:
 
 def classify(
     deal: dict,
-) -> tuple[bool, list[str], str | None, str | None, str | None]:
+) -> tuple[bool, list[str], str | None, str | None, str | None, str | None]:
     """Should the offer be sent to the frontend, and which genres does the game have?
 
     The title is checked first since it's free. Only what survives costs
@@ -259,7 +284,7 @@ def classify(
     when the sale is on GOG or Epic. Without a Steam id, GOG's catalog takes over.
     """
     if looks_like_extra(deal["title"]):
-        return False, [], None, None, None
+        return False, [], None, None, None, None
 
     app_id = deal.get("steamAppID")
 
@@ -272,15 +297,16 @@ def classify(
     # If neither responded we'd rather keep the row than lose a real
     # game. The game is then shown without a genre.
     if details is None:
-        return True, [], None, None, None
+        return True, [], None, None, None, None
 
     return (
-        details["type"] == "game",
+        details["type"] == "game" and not details.get("adult"),
         details["genres"],
         details.get("description"),
         details.get("minimum_requirements"),
         details.get("recommended_requirements"),
-)
+        details.get("launcher_notice"),
+    )
 
 
 # We only show free games and offers with at least this much discount (same
@@ -533,6 +559,7 @@ def to_row(
     description: str | None,
     minimum_requirements: str | None,
     recommended_requirements: str | None,
+    launcher_notice: str | None,
 ) -> dict:
     """Translates CheapShark's field names to our column names."""
     steam_app_id = deal.get("steamAppID")
@@ -568,6 +595,7 @@ def to_row(
         "description": description,
         "minimum_requirements": minimum_requirements,
         "recommended_requirements": recommended_requirements,
+        "launcher_notice": launcher_notice,
         # Filled in by add_end_dates. None means the end date is unknown.
         "ends_at": None,
     }
@@ -578,11 +606,11 @@ def to_row(
 UPSERT = text("""
     INSERT INTO offers (
         deal_id, title, store, normal_price, sale_price,
-        savings, is_free, thumb, steam_app_id, claim_url, genres, description, minimum_requirements, recommended_requirements, ends_at, fetched_at
+        savings, is_free, thumb, steam_app_id, claim_url, genres, description, minimum_requirements, recommended_requirements, launcher_notice, ends_at, fetched_at
 )
     VALUES (
         :deal_id, :title, :store, :normal_price, :sale_price,
-        :savings, :is_free, :thumb, :steam_app_id, :claim_url, :genres, :description, :minimum_requirements, :recommended_requirements, :ends_at, now()
+        :savings, :is_free, :thumb, :steam_app_id, :claim_url, :genres, :description, :minimum_requirements, :recommended_requirements, :launcher_notice, :ends_at, now()
     )
     ON CONFLICT (deal_id) DO UPDATE SET
         title        = EXCLUDED.title,
@@ -609,6 +637,7 @@ UPSERT = text("""
             EXCLUDED.recommended_requirements,
             offers.recommended_requirements
         ),
+        launcher_notice = COALESCE(EXCLUDED.launcher_notice, offers.launcher_notice),
         ends_at      = COALESCE(EXCLUDED.ends_at, offers.ends_at),
         fetched_at   = now()
 """)
@@ -660,7 +689,8 @@ def load_cache() -> tuple[dict[str, dict], set[str]]:
             for row in connection.execute(
                 text("""
                     SELECT deal_id, genres, description,
-                           minimum_requirements, recommended_requirements
+                           minimum_requirements, recommended_requirements,
+                           launcher_notice
                     FROM offers
                     WHERE description IS NOT NULL OR genres <> '{}'
                 """)
@@ -727,6 +757,7 @@ def main() -> None:
                     cached["description"],
                     cached["minimum_requirements"],
                     cached["recommended_requirements"],
+                    cached["launcher_notice"],
                 )
             )
             continue
@@ -742,6 +773,7 @@ def main() -> None:
             description,
             minimum_requirements,
             recommended_requirements,
+            launcher_notice,
         ) = classify(deal)
         time.sleep(LOOKUP_PAUSE)
 
@@ -753,6 +785,7 @@ def main() -> None:
                     description,
                     minimum_requirements,
                     recommended_requirements,
+                    launcher_notice,
                 )
             )
         else:

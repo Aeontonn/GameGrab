@@ -58,6 +58,10 @@ function OfferCard({ offer }: { offer: Offer }) {
 
       <h3>{offer.title}</h3>
 
+      {offer.launcher_notice && (
+        <p className="launcher-warning">⚠ Also requires: {offer.launcher_notice}</p>
+      )}
+
       {offer.genres.length > 0 && <p className="genres">{offer.genres.join(' · ')}</p>}
 
       {offer.description && (
@@ -350,6 +354,20 @@ function App() {
             </button> */}
           </div>
 
+          {freeLoad.state === 'ok' && (
+            <button
+              type="button"
+              className="jump-button"
+              onClick={() =>
+                document
+                  .getElementById('always-free')
+                  ?.scrollIntoView({ behavior: 'smooth' })
+              }
+            >
+              Jump to free to play games ↓
+            </button>
+          )}
+
           <p className="count">
             <strong>{visible.length}</strong>{' '}
             {endingWithinDays !== null
@@ -364,7 +382,7 @@ function App() {
           </ul>
 
           {freeLoad.state !== 'loading' && (
-            <section className="always-free">
+            <section className="always-free" id="always-free">
               <h2>Popular free games</h2>
 
               {freeLoad.state === 'error' ? (
@@ -393,6 +411,16 @@ function App() {
           )}
         </main>
       </div>
+
+      {/* Always visible, in the corner. */}
+      <button
+        type="button"
+        className="to-top-button"
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        aria-label="Back to top"
+      >
+        ↑ Top
+      </button>
     </>
   )
 }
