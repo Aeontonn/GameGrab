@@ -77,7 +77,12 @@ def collect() -> list[dict]:
         # Steam's own answer decides: a real game that is free forever.
         # is_free distinguishes free to play from a game that is only given
         # away for free for a short while.
-        if details is None or details["type"] != "game" or not details["is_free"]:
+        if (
+            details is None
+            or details["type"] != "game"
+            or not details["is_free"]
+            or details["adult"]
+        ):
             continue
 
         rows.append(

@@ -30,6 +30,10 @@ export type Offer = {
   minimum_requirements: string | null
   recommended_requirements: string | null
 
+  // Extra launcher or account the game needs besides the store's own, e.g.
+  // "Ubisoft Connect launcher". null when there is none.
+  launcher_notice: string | null
+
   // When the offer expires, as an ISO time. null when the store doesn't say.
   ends_at: string | null
 

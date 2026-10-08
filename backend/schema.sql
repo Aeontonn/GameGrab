@@ -65,6 +65,10 @@ ALTER TABLE offers ADD COLUMN IF NOT EXISTS recommended_requirements TEXT;
 -- When the offer expires, according to the store itself. NULL if the store doesn't say.
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ;
 
+-- Extra launcher or account the game needs besides the store's own, e.g.
+-- "Ubisoft Connect launcher". NULL when there is none.
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS launcher_notice TEXT;
+
 -- Games that are always free (free to play), separate from the time-limited
 -- offers in offers. Filled by fetch_free_games.py.
 CREATE TABLE IF NOT EXISTS free_games (
