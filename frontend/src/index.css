@@ -69,6 +69,7 @@ header p {
   padding: 6px 12px;
   font: inherit;
   font-size: 14px;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -153,6 +154,11 @@ header p {
   grid-template-columns: 180px 1fr;
   gap: 32px;
   align-items: start;
+}
+
+/* The button that expands the filters. Only used on mobile, see the bottom of the file. */
+.filter-toggle {
+  display: none;
 }
 
 aside h2 {
@@ -546,4 +552,102 @@ main > h2 {
 
   font-size: 0.9rem;
   cursor: pointer;
+}
+
+/* Mobile. The sidebar would take half the screen and push the cards out to the
+   side, so everything goes in one column and the filters fold up behind a button. */
+@media (max-width: 700px) {
+  body {
+    padding: 16px 16px 88px; /* Room at the bottom so "Top" doesn't cover the last game. */
+  }
+
+  /* A long email shouldn't push the title together. */
+  .account-email {
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  aside .filter-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    min-height: 44px;
+    margin: 0;
+    padding: 0 14px;
+    font: inherit;
+  }
+
+  .filter-panel {
+    display: none;
+  }
+
+  /* Two columns of options, so the list takes half the height. Headings,
+     "Show all" and "Time left" span the whole width. */
+  .filter-panel.open {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 16px;
+    margin-top: 12px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  .filter-panel > h2,
+  .filter-panel > button,
+  .time-filter {
+    grid-column: 1 / -1;
+  }
+
+  .filter-panel > button {
+    justify-self: start;
+  }
+
+  .time-filter {
+    margin-top: 20px;
+  }
+
+  /* Bigger rows, easier to hit with a finger. */
+  .filter-option {
+    padding: 8px 0;
+  }
+
+  .search-bar {
+    max-width: none;
+    margin: 12px 0 16px;
+    transform: none;
+    box-sizing: border-box;
+  }
+
+  /* At least 44px high, Apple's and Google's recommendation for touch. */
+  .account button,
+  aside button,
+  .jump-button,
+  .requirements-button,
+  .share-button {
+    min-height: 44px;
+  }
+
+  .offer-actions {
+    justify-content: space-between;
+  }
+
+  .to-top-button {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  /* Nothing to go back to at the top, so it would only be in the way. */
+  .to-top-button.at-top {
+    display: none;
+  }
 }
