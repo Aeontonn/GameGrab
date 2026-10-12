@@ -166,6 +166,20 @@ function App() {
   // visitor has to actively choose it.
   const [endingWithinDays, setEndingWithinDays] = useState<number | null>(null)
 
+  // Whether the filters are expanded. Only matters on mobile – on a wide screen
+  // the filters are always shown in the sidebar.
+  const [filtersOpen, setFiltersOpen] = useState(false)
+
+  // Whether the page is scrolled to the top. On mobile the "Top" button is
+  // hidden there, since it would only cover the content.
+  const [atTop, setAtTop] = useState(true)
+
+  useEffect(() => {
+    const onScroll = () => setAtTop(window.scrollY < 400)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   // Runs once when the page loads: fetch the offers from the backend.
   useEffect(() => {
     fetchOffers()
@@ -239,7 +253,8 @@ function App() {
     [freeGames, genres, matchesSearch],
   )
 
-  const anyFilter = stores.length > 0 || genres.length > 0 || endingWithinDays !== null
+  const activeFilters = stores.length + genres.length + (endingWithinDays !== null ? 1 : 0)
+  const anyFilter = activeFilters > 0
 
   if (load.state === 'loading') {
     return <p className="status">Fetching offers…</p>
@@ -268,60 +283,74 @@ function App() {
 
       <div className="layout">
         <aside>
-          <h2>Store</h2>
-          {STORES.map((store) => (
-            <label key={store} className="filter-option">
-              <input
-                type="checkbox"
-                checked={stores.includes(store)}
-                onChange={() => setStores((current) => toggle(current, store))}
-              />
-              {store}
-            </label>
-          ))}
-
-          <h2>Genre</h2>
-          {allGenres.map((genre) => (
-            <label key={genre} className="filter-option">
-              <input
-                type="checkbox"
-                checked={genres.includes(genre)}
-                onChange={() => setGenres((current) => toggle(current, genre))}
-              />
-              {genre}
-            </label>
-          ))}
-
+          {/* Only shown on mobile, where the filters would otherwise fill the
+              whole first screen before any games are visible. */}
           <button
             type="button"
-            onClick={() => {
-              setStores([])
-              setGenres([])
-              setEndingWithinDays(null)
-            }}
-            disabled={!anyFilter}
+            className="filter-toggle"
+            onClick={() => setFiltersOpen((current) => !current)}
+            aria-expanded={filtersOpen}
+            aria-controls="filter-panel"
           >
-            Show all
+            <span>Filter{anyFilter && ` (${activeFilters})`}</span>
+            <span aria-hidden="true">{filtersOpen ? '−' : '+'}</span>
           </button>
 
-          {/* Sits below "Show all", separate from store and genre: it's a
-              choice you make actively, not one of the regular filters. */}
-          <div className="time-filter">
-            <h2>Time left</h2>
-
-            {[1, 2, 7].map((days) => (
-              <label key={days} className="filter-option">
+          <div id="filter-panel" className={filtersOpen ? 'filter-panel open' : 'filter-panel'}>
+            <h2>Store</h2>
+            {STORES.map((store) => (
+              <label key={store} className="filter-option">
                 <input
-                  type="radio"
-                  name="time-left"
-                  checked={endingWithinDays === days}
-                  onChange={() => setEndingWithinDays(days)}
+                  type="checkbox"
+                  checked={stores.includes(store)}
+                  onChange={() => setStores((current) => toggle(current, store))}
                 />
-                Ends within {days} {days === 1 ? 'day' : 'days'}
+                {store}
               </label>
             ))}
-          </div>
 
+            <h2>Genre</h2>
+            {allGenres.map((genre) => (
+              <label key={genre} className="filter-option">
+                <input
+                  type="checkbox"
+                  checked={genres.includes(genre)}
+                  onChange={() => setGenres((current) => toggle(current, genre))}
+                />
+                {genre}
+              </label>
+            ))}
+
+            <button
+              type="button"
+              onClick={() => {
+                setStores([])
+                setGenres([])
+                setEndingWithinDays(null)
+              }}
+              disabled={!anyFilter}
+            >
+              Show all
+            </button>
+
+            {/* Sits below "Show all", separate from store and genre: it's a
+                choice you make actively, not one of the regular filters. */}
+            <div className="time-filter">
+              <h2>Time left</h2>
+
+              {[1, 2, 7].map((days) => (
+                <label key={days} className="filter-option">
+                  <input
+                    type="radio"
+                    name="time-left"
+                    checked={endingWithinDays === days}
+                    onChange={() => setEndingWithinDays(days)}
+                  />
+                  Ends within {days} {days === 1 ? 'day' : 'days'}
+                </label>
+              ))}
+            </div>
+          </div>
         </aside>
 
         <main>
@@ -412,10 +441,10 @@ function App() {
         </main>
       </div>
 
-      {/* Always visible, in the corner. */}
+      {/* In the corner. Always visible on a wide screen, only after scrolling on mobile. */}
       <button
         type="button"
-        className="to-top-button"
+        className={atTop ? 'to-top-button at-top' : 'to-top-button'}
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         aria-label="Back to top"
       >
