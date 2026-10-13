@@ -545,9 +545,11 @@ def collect(start_page: int) -> tuple[list[dict], int]:
         time.sleep(PAGE_PAUSE)
 
     # Everything that costs zero right now. Fetched every run, since there are
-    # few of them and they are what visitors want most.
+    # few of them and they are what visitors want most. Games that are always
+    # free (normal price 0) are not offers – fetch_free_games.py handles them.
     for deal in fetch_page(storeID=store_ids, pageSize=PAGE_SIZE, upperPrice=0):
-        deals[deal["dealID"]] = deal
+        if float(deal["normalPrice"]) > 0:
+            deals[deal["dealID"]] = deal
 
     # The key is dealID, so the same offer can only appear once.
     return list(deals.values()), next_page
