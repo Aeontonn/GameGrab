@@ -738,6 +738,11 @@ def main() -> None:
 
     print("Filtering out add-ons, editions and bundles…")
     known, skipped = load_cache()
+
+    # The lookup cap can leave deals for the next run, so the best ones go
+    # first: free games, then the biggest discounts. Otherwise the free games
+    # (collected last) are the first to be left behind.
+    deals.sort(key=lambda deal: (float(deal["salePrice"]) > 0, -float(deal["savings"])))
     rows = []
     new_skipped = []
     lookups = 0
