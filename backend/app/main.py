@@ -74,7 +74,10 @@ def offers():
             rows = connection.execute(
                 text("""
                     SELECT id, title, store, normal_price, sale_price, savings,
-                           is_free, thumb, steam_app_id, claim_url, genres, description, minimum_requirements, recommended_requirements, launcher_notice, ends_at, fetched_at
+                        is_free, thumb, steam_app_id, claim_url, genres, description,
+                        minimum_requirements, recommended_requirements, launcher_notice,
+                        review_positive_percent, review_total, review_source,
+                        ends_at, fetched_at
                     FROM offers
                     WHERE (is_free OR savings >= :min_savings)
                       AND (ends_at IS NULL OR ends_at > now())
@@ -103,6 +106,11 @@ def offers():
             "normal_price": float(row["normal_price"]),
             "sale_price": float(row["sale_price"]),
             "savings": float(row["savings"]),
+            "review_positive_percent": (
+                float(row["review_positive_percent"])
+                if row["review_positive_percent"] is not None
+                else None
+            ),
             "fetched_at": row["fetched_at"].isoformat(),
             # None when the store doesn't provide an end date.
             "ends_at": row["ends_at"].isoformat() if row["ends_at"] else None,

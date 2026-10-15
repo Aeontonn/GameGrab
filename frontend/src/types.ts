@@ -34,6 +34,13 @@ export type Offer = {
   // "Ubisoft Connect launcher". null when there is none.
   launcher_notice: string | null
 
+  // Steam review summary. Also used for games sold on GOG or Epic
+  // when the same game has a Steam App ID.
+  // null when no review data is available.
+  review_positive_percent: number | null
+  review_total: number | null
+  review_source: string | null
+
   // When the offer expires, as an ISO time. null when the store doesn't say.
   ends_at: string | null
 

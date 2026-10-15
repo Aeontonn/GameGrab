@@ -40,6 +40,12 @@ CREATE TABLE IF NOT EXISTS offers (
     minimum_requirements TEXT,
     recommended_requirements TEXT,
 
+    -- Review summary from Steam (can also be shown for games sold on other stores).
+    review_positive_percent NUMERIC(5,1),
+    review_total INTEGER,
+    review_source TEXT,
+    reviews_fetched_at TIMESTAMPTZ,
+
     -- When the offer expires, according to the store itself. NULL if the store doesn't say.
     ends_at         TIMESTAMPTZ,
 
@@ -68,6 +74,18 @@ ALTER TABLE offers ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ;
 -- Extra launcher or account the game needs besides the store's own, e.g.
 -- "Ubisoft Connect launcher". NULL when there is none.
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS launcher_notice TEXT;
+
+ALTER TABLE offers
+ADD COLUMN IF NOT EXISTS review_positive_percent NUMERIC(5,1);
+
+ALTER TABLE offers
+ADD COLUMN IF NOT EXISTS review_total INTEGER;
+
+ALTER TABLE offers
+ADD COLUMN IF NOT EXISTS review_source TEXT;
+
+ALTER TABLE offers
+ADD COLUMN IF NOT EXISTS reviews_fetched_at TIMESTAMPTZ;
 
 -- Games that are always free (free to play), separate from the time-limited
 -- offers in offers. Filled by fetch_free_games.py.
