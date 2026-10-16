@@ -31,6 +31,9 @@ const timeLeft = (endsAt: string | null): string | null => {
 const withoutRequirementLabel = (value: string): string =>
   value.replace(/^(Minimum|Recommended):\s*/i, '')
 
+// How many offers are shown per page.
+const ITEMS_PER_PAGE = 12
+
 // One offer as a card.
 function OfferCard({ offer }: { offer: Offer }) {
   const left = timeLeft(offer.ends_at)
@@ -185,6 +188,9 @@ function App() {
   // hidden there, since it would only cover the content.
   const [atTop, setAtTop] = useState(true)
 
+  // Which page of the offers is shown, starting at 1.
+  const [currentPage, setCurrentPage] = useState(1)
+
   useEffect(() => {
     const onScroll = () => setAtTop(window.scrollY < 400)
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -203,6 +209,11 @@ function App() {
       .then((games) => setFreeLoad({ state: 'ok', games }))
       .catch(() => setFreeLoad({ state: 'error' }))
   }, [])
+
+  // A new filter or search gives a new list, so we start over from page 1.
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [stores, genres, endingWithinDays, searchTerm])
 
   const freeGames = useMemo(
     () => (freeLoad.state === 'ok' ? freeLoad.games : []),
@@ -251,6 +262,17 @@ function App() {
       (offer) => offer.ends_at && new Date(offer.ends_at).getTime() < limit,
     )
   }, [load, stores, genres, endingWithinDays, openedAt, matchesSearch])
+
+  // The page number is capped to the last page, in case the list gets shorter
+  // than the page we're on.
+  const totalPages = Math.max(1, Math.ceil(visible.length / ITEMS_PER_PAGE))
+  const safePage = Math.min(currentPage, totalPages)
+
+  // Only the offers on the current page are shown.
+  const paginatedOffers = useMemo(() => {
+    const start = (safePage - 1) * ITEMS_PER_PAGE
+    return visible.slice(start, start + ITEMS_PER_PAGE)
+  }, [visible, safePage])
 
   // The genre filter also applies to "Always free". The store filter doesn't,
   // since nearly all of those games are on Steam.
@@ -416,10 +438,42 @@ function App() {
           </p>
 
           <ul className="offers">
-            {visible.map((offer) => (
+            {paginatedOffers.map((offer) => (
               <OfferCard key={offer.id} offer={offer} />
             ))}
           </ul>
+
+          {/* Only shown when there is more than one page. Scrolls to the top
+              so the visitor sees the first card of the new page. */}
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentPage((p) => Math.max(1, p - 1))
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                disabled={safePage === 1}
+              >
+                ← Previous
+              </button>
+
+              <span className="page-indicator">
+                {safePage} / {totalPages}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                disabled={safePage === totalPages}
+              >
+                Next →
+              </button>
+            </div>
+          )}
 
           {freeLoad.state !== 'loading' && (
             <section className="always-free" id="always-free">

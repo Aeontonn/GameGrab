@@ -555,6 +555,44 @@ main > h2 {
   cursor: pointer;
 }
 
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  margin: 2.5rem 0;
+}
+
+.pagination button {
+  padding: 0.6rem 1.2rem;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  min-width: 110px;
+}
+
+.pagination button:hover:not(:disabled) {
+  border-color: var(--text-dim);
+}
+
+.pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-indicator {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 70px;
+  text-align: center;
+}
+
 /* Mobile. The sidebar would take half the screen and push the cards out to the
    side, so everything goes in one column and the filters fold up behind a button. */
 @media (max-width: 700px) {
