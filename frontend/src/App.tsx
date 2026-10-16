@@ -32,7 +32,7 @@ const withoutRequirementLabel = (value: string): string =>
   value.replace(/^(Minimum|Recommended):\s*/i, '')
 
 // How many offers are shown per page.
-const ITEMS_PER_PAGE = 12
+const ITEMS_PER_PAGE = 40
 
 // One offer as a card.
 function OfferCard({ offer }: { offer: Offer }) {
