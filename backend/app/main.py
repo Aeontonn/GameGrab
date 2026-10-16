@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 import os
+import re
 
 # Loads settings from backend/.env. Full path, so the file is found regardless of which folder the server is started from.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -20,6 +21,11 @@ if not DATABASE_URL:
 # GameGrab only shows real bargains: free games and at least 80% off.
 # Smaller discounts stay in the database but are never returned.
 MIN_SAVINGS_PERCENT = float(os.getenv("MIN_SAVINGS_PERCENT", "80"))
+
+# Cap on near-identical titles ("3D Puzzle: Cats", "3D Puzzle: Dogs"…) so one
+# series can't flood the page. Offers come biggest-discount first, so the best
+# ones of each series are the ones kept. 0 turns the cap off.
+MAX_PER_SERIES = int(os.getenv("MAX_PER_SERIES", "3"))
 
 # Handles all contact with the database. pool_pre_ping checks that the connection is alive, since hosted databases close idle connections.
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
@@ -55,6 +61,41 @@ def health():
         )
 
     return {"status": "ok", "database": "connected"}
+
+
+_FILLER = {"the", "a", "an", "of", "and", "game", "games", "edition", "collection", "pack", "bundle", "deluxe"}
+
+
+def series_keys(title: str) -> set[str]:
+    """Word pairs in the title, ignoring numbers and filler like "the".
+
+    "3D Puzzle: Cats" and "Cute Cats 3D Puzzle" both contain "3d puzzle", so
+    they count as the same series, while "The Witcher 3" and "The Sims" share
+    nothing. A one-word title is its own key.
+    """
+    words = [
+        w for w in re.findall(r"[a-z0-9']+", title.lower())
+        if w not in _FILLER and (not w.isdigit())
+    ]
+    if len(words) < 2:
+        return set(words)
+    return {f"{a} {b}" for a, b in zip(words, words[1:])}
+
+
+def limit_series(rows: list, cap: int) -> list:
+    """Keeps the first `cap` offers per series, preserving the order."""
+    if cap <= 0:
+        return rows
+    seen: dict[str, int] = {}
+    kept = []
+    for row in rows:
+        keys = series_keys(row["title"])
+        if any(seen.get(k, 0) >= cap for k in keys):
+            continue
+        for k in keys:
+            seen[k] = seen.get(k, 0) + 1
+        kept.append(row)
+    return kept
 
 
 # The offers the frontend renders: not expired, and either free or at least 80 percent off.
@@ -115,7 +156,7 @@ def offers():
             # None when the store doesn't provide an end date.
             "ends_at": row["ends_at"].isoformat() if row["ends_at"] else None,
         }
-        for row in rows
+        for row in limit_series(rows, MAX_PER_SERIES)
     ]
 
 
