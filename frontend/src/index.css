@@ -593,17 +593,6 @@ main > h2 {
   text-align: center;
 }
 
-.game-reviews {
-  font-size: 0.85rem;
-  color: #888;
-  margin: 0.5rem 0;
-}
-
-.game-reviews strong {
-  color: inherit;
-  font-weight: 600;
-}
-
 /* Mobile. The sidebar would take half the screen and push the cards out to the
    side, so everything goes in one column and the filters fold up behind a button. */
 @media (max-width: 700px) {
@@ -700,4 +689,15 @@ main > h2 {
   .to-top-button.at-top {
     display: none;
   }
+}
+
+.game-reviews {
+  font-size: 0.85rem;
+  color: #888;
+  margin: 0.5rem 0;
+}
+
+.game-reviews strong {
+  color: inherit;
+  font-weight: 600;
 }
