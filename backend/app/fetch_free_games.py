@@ -21,7 +21,7 @@ import time
 from sqlalchemy import text
 
 # Reuses the Steam lookup and title filter from the offer fetcher.
-from app.fetch_offers import USER_AGENT, engine, looks_like_extra, steam_details
+from app.fetch_offers import USER_AGENT, engine, looks_adult, looks_like_extra, steam_details
 
 # How many games the list should contain.
 TARGET = 150
@@ -68,7 +68,7 @@ def collect() -> list[dict]:
         if len(rows) >= TARGET:
             break
 
-        if looks_like_extra(title):
+        if looks_like_extra(title) or looks_adult(title):
             continue
 
         details = steam_details(app_id)

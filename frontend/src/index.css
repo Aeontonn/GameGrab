@@ -3,14 +3,14 @@
 
 :root {
   /* Backgrounds, lighter the closer they are to the viewer. */
-  --bg: #14151a;        /* the page */
-  --surface: #1b1d25;   /* the cards */
-  --line: #23252f;      /* borders */
+  --bg: #14151a; /* the page */
+  --surface: #1b1d25; /* the cards */
+  --line: #23252f; /* borders */
   --line-strong: #2d2f38;
 
   /* Shades of white, from headings down to the least important. */
-  --text: #edeef2;      /* headings and titles */
-  --text-dim: #888e96;  /* store, prices, filter options */
+  --text: #edeef2; /* headings and titles */
+  --text-dim: #888e96; /* store, prices, filter options */
   --text-faint: #585d63; /* footnotes and technical info */
 
   /* Status colors. Not part of the palette, but they carry information. */
@@ -266,6 +266,7 @@ aside button:disabled {
 
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
