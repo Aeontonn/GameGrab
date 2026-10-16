@@ -14,7 +14,14 @@ The first version of GameGrab should make it possible to:
 - See which platform the offer is on
 - See how long the offer lasts
 - Go to the platform where the game can be claimed
-- Filter between different platforms
+- Filter between different platforms and genres
+- See Steam review scores for the games
+- Browse offers page by page
+- See popular games that are always free (free to play)
+- Create an account and log in
+
+Adult games are filtered out, and only real bargains are shown: free games and
+offers with at least 80% off.
 
 ## Tech stack
 
@@ -28,24 +35,30 @@ The first version of GameGrab should make it possible to:
 - FastAPI
 - SQLAlchemy
 
-**Database**
+**Database and login**
 - PostgreSQL via Supabase
+- Supabase Auth for accounts
 
 **Deployment**
 - Frontend: Vercel
 - Backend: Render
 - Database: Supabase
 
-**Version control**
+**Automation and version control**
 - Git and GitHub
+- GitHub Actions (CI and scheduled fetching of offers)
 
 ## Project structure
 
+```text
 GameGrab/
-├── Skol_filer/    # Course-related documentation
-├── backend/       # FastAPI and database access
-├── frontend/      # The React application
+├── .github/workflows/   # CI and the scheduled fetch jobs
+├── Skol_filer/          # Course-related documentation
+├── backend/             # FastAPI, database access and fetch scripts
+├── docs/                # Design images
+├── frontend/            # The React application
 └── README.md
+```
 
 ## Local development
 
@@ -55,7 +68,6 @@ Go to the backend:
 
 ```bash
 cd backend
-
 ```
 
 Create a Python virtual environment:
@@ -72,6 +84,12 @@ On Windows:
 .venv\Scripts\activate
 ```
 
+On macOS/Linux:
+
+```bash
+source .venv/bin/activate
+```
+
 Install the backend dependencies:
 
 ```bash
@@ -86,11 +104,16 @@ Create the file `.env` in `backend/` and use `.env.example` as a template:
 
 ```env
 DATABASE_URL=
+MIN_SAVINGS_PERCENT=80
+MAX_PER_SERIES=3
 ```
 
-Put the database connection string after `DATABASE_URL=`.
+- `DATABASE_URL` (required): the database connection string from Supabase.
+- `MIN_SAVINGS_PERCENT` (optional, default 80): minimum discount for an offer to be shown.
+- `MAX_PER_SERIES` (optional, default 3): max number of near-identical titles (same series) shown. 0 turns the cap off.
 
 `.env` contains sensitive information and must not be pushed to GitHub.
+Never put real values in `.env.example`, since that file is pushed.
 
 Start the backend:
 
@@ -140,13 +163,18 @@ http://localhost:5173
 
 The frontend communicates with the FastAPI backend through API requests.
 
-The backend currently has the endpoint:
+The backend has three endpoints:
 
-```text
-GET /health
-```
+| Endpoint | Description |
+| --- | --- |
+| `GET /health` | Checks that the server works and can reach the database |
+| `GET /offers` | Current free games and big discounts |
+| `GET /free-games` | Popular games that are always free |
 
-It is used to check that the FastAPI server works and that it can connect to the PostgreSQL database.
+All of them answer with status 503 and `"database": "disconnected"` if the
+database can't be reached, so the frontend never mistakes an outage for "no offers".
+
+`/health` is used to check that the FastAPI server works and that it can connect to the PostgreSQL database.
 
 If both the backend and the database work, it returns:
 
@@ -266,7 +294,22 @@ During local development the backend allows requests from:
 http://localhost:5173
 ```
 
-When the frontend is deployed to Vercel, the published Vercel address also needs to be added as an allowed origin in the backend.
+and from the deployed frontend:
+
+```text
+https://gamegrab.vercel.app
+```
+
+The list of allowed origins is in `backend/app/main.py`. If the frontend moves to
+another address, add it there.
+
+## Checks (CI)
+
+`.github/workflows/ci.yml` runs on every pull request against `main` and on every
+push to `main`:
+
+- **Frontend:** `npm ci`, lint (`oxlint`) and the build, which also type-checks with TypeScript.
+- **Backend:** installs the dependencies, checks the syntax and checks that the app loads.
 
 ## Project status
 
@@ -275,9 +318,11 @@ The project is under development.
 Currently in place:
 
 - React + TypeScript + Vite frontend
-- FastAPI backend
-- PostgreSQL connection via SQLAlchemy
-- Supabase as the database
-- `/health` endpoint to check the backend and database
-- Frontend that checks the connection to the backend
+- FastAPI backend with PostgreSQL via SQLAlchemy and Supabase
+- `/health`, `/offers` and `/free-games` endpoints
+- Offers fetched from CheapShark every hour, popular free games from Steam every day
+- Steam review scores, genre and store filters, and pagination
+- Filtering of adult games and of small discounts
+- Accounts and login through Supabase Auth
+- CI on every pull request
 - Support for different backend addresses through `VITE_API_URL`
