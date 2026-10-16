@@ -187,6 +187,45 @@ def steam_details(app_id: str) -> dict | None:
         "recommended_requirements": recommended_requirements,
     }
 
+def steam_reviews(app_id: str) -> dict | None:
+    """Fetches Steam review summary for a game."""
+
+    url = (
+        f"https://store.steampowered.com/appreviews/{app_id}"
+        "?json=1"
+        "&filter=all"
+        "&language=all"
+        "&review_type=all"
+        "&purchase_type=all"
+        "&num_per_page=0"
+    )
+
+    request = Request(
+        url,
+        headers={"User-Agent": USER_AGENT},
+    )
+
+    try:
+        with urlopen(request, timeout=20) as response:
+            payload = json.load(response)
+    except Exception:
+        return None
+
+    if payload.get("success") != 1:
+        return None
+
+    summary = payload.get("query_summary") or {}
+
+    positive = summary.get("total_positive", 0)
+    total = summary.get("total_reviews", 0)
+
+    return {
+        "review_positive_percent": (
+            round(positive / total * 100, 1) if total > 0 else None
+        ),
+        "review_total": total,
+        "review_source": "Steam",
+    }
 
 GOG_CATALOG = "https://catalog.gog.com/v1/catalog"
 
@@ -456,22 +495,24 @@ def fetch_page(**params) -> list[dict]:
             with urlopen(request, timeout=30) as response:
                 return json.load(response)
         except HTTPError as error:
-            if error.code not in (400, 429, 500, 502, 503) or attempt == 4:
-                raise
+                if error.code not in (400, 429, 500, 502, 503) or attempt == 4:
+                    print(f"CheapShark request failed: {url}", flush=True)
+                    print(f"HTTP status: {error.code}", flush=True)
+                    raise
 
             # When blocked, CheapShark says how long in Retry-After (seconds).
             # A short wait is worth sitting out; a long one (it can be nearly
             # an hour) is not – better to stop now and let the next run try.
-            retry_after = error.headers.get("Retry-After")
-            if retry_after and retry_after.isdigit():
-                if int(retry_after) > MAX_WAIT:
-                    raise RuntimeError(
-                        f"CheapShark has blocked us for {retry_after} seconds "
-                        "(rate limit). Nothing was changed; try again later."
-                    ) from error
-                time.sleep(int(retry_after) + 1)
-            else:
-                time.sleep(10 * 2**attempt)
+                retry_after = error.headers.get("Retry-After")
+                if retry_after and retry_after.isdigit():
+                    if int(retry_after) > MAX_WAIT:
+                        raise RuntimeError(
+                            f"CheapShark has blocked us for {retry_after} seconds "
+                            "(rate limit). Nothing was changed; try again later."
+                        ) from error
+                    time.sleep(int(retry_after) + 1)
+                else:
+                    time.sleep(10 * 2**attempt)
 
 
 # CheapShark allows at most 60 deals per page.
@@ -523,13 +564,26 @@ def collect(start_page: int) -> tuple[list[dict], int]:
     # Biggest discount first, so the list ends where deals drop below the
     # threshold – everything after it is smaller still.
     for page in range(start_page, start_page + PAGES_PER_RUN):
-        batch = fetch_page(
-            storeID=store_ids,
-            pageSize=PAGE_SIZE,
-            pageNumber=page,
-            sortBy="Savings",  # biggest discount first by default; desc=1 would reverse it
-            onSale=1,
-        )
+        try:
+            batch = fetch_page(
+                storeID=store_ids,
+                pageSize=PAGE_SIZE,
+                pageNumber=page,
+                sortBy="Savings",  # biggest discount first by default; desc=1 would reverse it
+                onSale=1,
+            )
+
+        except HTTPError as error:
+            if error.code == 400 and page > 0:
+                print(
+                    f"  CheapShark rejected page {page}. "
+                    "Restarting from page 0 next run.",
+                    flush=True,
+                )
+                next_page = 0
+                break
+            raise
+
         print(f"  page {page + 1}: {len(batch)} deals", flush=True)
         for deal in batch:
             if float(deal["savings"]) >= MIN_SHOWN_SAVINGS:
@@ -651,10 +705,67 @@ def save(rows: list[dict]) -> None:
         connection.execute(UPSERT, rows)
 
 
+def update_reviews(limit: int = 20) -> None:
+    """Updates missing or outdated Steam review summaries.
+
+    Only games with a Steam App ID are included.
+    Reviews are refreshed at most once every 24 hours.
+    """
+
+    with engine.connect() as connection:
+        games = connection.execute(
+            text("""
+                SELECT steam_app_id
+                FROM offers
+                WHERE steam_app_id IS NOT NULL
+                    AND (is_free OR savings >= :min_savings)
+                    AND (ends_at IS NULL OR ends_at > now())
+                    AND (
+                        reviews_fetched_at IS NULL
+                        OR reviews_fetched_at < now() - interval '24 hours'
+                    )
+                GROUP BY steam_app_id
+                ORDER BY MIN(reviews_fetched_at) ASC NULLS FIRST, steam_app_id
+                LIMIT :limit
+            """),
+            {"limit": limit, "min_savings": MIN_SHOWN_SAVINGS},
+        ).scalars().all()
+
+    updated = 0
+
+    for app_id in games:
+        reviews = steam_reviews(app_id)
+
+        if reviews is None:
+            # Don't erase existing ratings when Steam doesn't respond.
+            continue
+
+        with engine.begin() as connection:
+            connection.execute(
+                text("""
+                    UPDATE offers
+                    SET review_positive_percent = :review_positive_percent,
+                        review_total = :review_total,
+                        review_source = :review_source,
+                        reviews_fetched_at = now()
+                    WHERE steam_app_id = :steam_app_id
+                """),
+                {
+                    "steam_app_id": app_id,
+                    **reviews,
+                },
+            )
+
+        updated += 1
+        time.sleep(1)
+
+    print(f"  Updated reviews for {updated} games")
+
+
 # An offer stays until it hasn't been seen for this long. A run only covers part
 # of the list, so "not in this run" says nothing – but a full pass takes a few
 # hours, so an offer nobody has refreshed for this long has ended.
-STALE_AFTER_HOURS = 12
+STALE_AFTER_HOURS = 48
 
 
 def remove_stale() -> int:
@@ -813,6 +924,12 @@ def main() -> None:
     # from the same page.
     save_cursor(next_page)
     forget_old_skipped()
+
+    print("Updating Steam reviews…")
+    try:
+        update_reviews(limit=50)
+    except Exception as error:
+        print(f"  Could not update Steam reviews: {error}")
 
     stale = remove_stale()
     if stale:

@@ -64,6 +64,17 @@ function OfferCard({ offer }: { offer: Offer }) {
 
       {offer.genres.length > 0 && <p className="genres">{offer.genres.join(' · ')}</p>}
 
+      {offer.review_positive_percent !== null &&
+        offer.review_total !== null &&
+        offer.review_total > 0 &&
+        offer.review_source && (
+          <p className="game-reviews">
+            <strong>{Math.round(offer.review_positive_percent)}% positive</strong>
+            {' · '}
+            {offer.review_total.toLocaleString('en-US')} reviews on {offer.review_source}
+          </p>
+        )}
+
       {offer.description && (
         <p className="description">{offer.description}</p>
       )}
