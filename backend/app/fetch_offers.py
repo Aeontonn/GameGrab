@@ -79,20 +79,45 @@ GAME_GENRE_IDS = {
     "29",  # Massively Multiplayer
 }
 
-# Steam's own adult markers. Descriptor 3 is "Adult Only Sexual Content", which
-# Steam requires for sexual games such as hentai. Genre 71 is "Sexual Content".
-# Mature-but-not-sexual games (GTA, Witcher…) only get descriptors 1, 2 and 5
-# ("Some Nudity", violence, general mature), so they are not caught.
-ADULT_DESCRIPTOR_IDS = {3}
+# Steam's own adult markers. The content descriptors are 1 "Some Nudity or
+# Sexual Content", 3 "Adult Only Sexual Content" and 4 "Frequent Nudity or
+# Sexual Content". Genre 71 is "Sexual Content". Descriptors 2 (violence) and 5
+# (general mature) are not blocked on their own, but 1 is: it also catches
+# mature games like Witcher and GTA, which we accept to keep the site clean.
+# An age gate of 18+ counts as adult too.
+ADULT_DESCRIPTOR_IDS = {1, 3, 4}
 ADULT_GENRE_IDS = {"71"}
+ADULT_MIN_AGE = 18
 
 
 def is_adult(data: dict) -> bool:
-    """True if Steam marks the game as sexual/adult-only content."""
+    """True if Steam marks the game as sexual/adult content."""
     descriptors = (data.get("content_descriptors") or {}).get("ids") or []
     if ADULT_DESCRIPTOR_IDS.intersection(descriptors):
         return True
-    return any(genre["id"] in ADULT_GENRE_IDS for genre in data.get("genres", []))
+    if any(genre["id"] in ADULT_GENRE_IDS for genre in data.get("genres", [])):
+        return True
+    try:
+        return int(data.get("required_age") or 0) >= ADULT_MIN_AGE
+    except (TypeError, ValueError):
+        return False
+
+
+# Stores other than Steam don't give us content markers, so for games without
+# a Steam id we go by the title. The regex catches obvious words; the list
+# holds known adult games whose names don't give them away.
+ADULT_TITLE = re.compile(
+    r"hentai|nsfw|erotic|porn|\bsex(y|ual)?\b|\bnude|\bnaked|strip(per| poker|tease)|"
+    r"waifu|ecchi|fetish|brothel|\blust\b|\bharem\b|\bmilf\b|\bboobs?\b|\bpanties\b|"
+    r"\badult\b|\b18\+",
+    re.IGNORECASE,
+)
+ADULT_TITLES = {"huniepop", "huniepop 2 double date", "negligee"}
+
+
+def looks_adult(title: str) -> bool:
+    """Guesses from the title whether the game is adult."""
+    return ADULT_TITLE.search(title) is not None or normalize_title(title) in ADULT_TITLES
 
 
 # Steam lists third-party launchers/accounts a game needs besides Steam itself,
@@ -322,7 +347,7 @@ def classify(
     The genre belongs to the game, not the store, so Steam can answer even
     when the sale is on GOG or Epic. Without a Steam id, GOG's catalog takes over.
     """
-    if looks_like_extra(deal["title"]):
+    if looks_like_extra(deal["title"]) or looks_adult(deal["title"]):
         return False, [], None, None, None, None
 
     app_id = deal.get("steamAppID")
@@ -330,6 +355,13 @@ def classify(
     # With a Steam id we ask Steam. Without an id, or if Steam doesn't respond,
     # we try GOG's catalog instead.
     details = steam_details(app_id) if app_id else None
+
+    # Steam is the only source of content markers. If it has an id for the game
+    # but doesn't answer, we can't tell whether it's adult, so the row is left
+    # out until the next run rather than risk showing it.
+    if app_id and details is None:
+        return False, [], None, None, None, None
+
     if details is None:
         details = gog_details(deal["title"])
 
