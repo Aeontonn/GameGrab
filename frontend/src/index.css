@@ -172,7 +172,11 @@ aside h2 {
 }
 
 .filter-option {
-  display: block;
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  white-space: nowrap;
+  gap: 6px;
   padding: 4px 0;
   cursor: pointer;
   color: var(--text-dim);
@@ -200,7 +204,10 @@ aside button:disabled {
 
 /* "Time left" sits on its own below "Show all", with space above. */
 .time-filter {
-  margin-top: 32px;
+  margin-top: 0;
+  position: absolute;
+  right: 12px;
+  top: calc(100% + 10px);
 }
 
 .count {
@@ -504,6 +511,7 @@ main > h2 {
 
 .search-bar {
   display: flex;
+  position: relative;
   align-items: center;
   gap: 12px;
 
