@@ -172,6 +172,7 @@ function App() {
   // Which stores are checked. An empty list means "show all".
   const [stores, setStores] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [showTimeFilter, setShowTimeFilter] = useState(false)
 
   // Which genres are checked. An empty list means "show all".
   const [genres, setGenres] = useState<string[]>([])
@@ -366,23 +367,6 @@ function App() {
               Show all
             </button>
 
-            {/* Sits below "Show all", separate from store and genre: it's a
-                choice you make actively, not one of the regular filters. */}
-            <div className="time-filter">
-              <h2>Time left</h2>
-
-              {[1, 2, 7].map((days) => (
-                <label key={days} className="filter-option">
-                  <input
-                    type="radio"
-                    name="time-left"
-                    checked={endingWithinDays === days}
-                    onChange={() => setEndingWithinDays(days)}
-                  />
-                  Ends within {days} {days === 1 ? 'day' : 'days'}
-                </label>
-              ))}
-            </div>
           </div>
         </aside>
 
@@ -410,11 +394,33 @@ function App() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
 
-            {/* Hidden until the button does something.
-            <button className="search-action" type="button">
-              Filter
-            </button> */}
-          </div>
+            <button
+              className="search-action"
+              type="button"
+              onClick={() => setShowTimeFilter(!showTimeFilter)}
+            >
+              ☰
+            </button>
+
+            {showTimeFilter && (
+              <div className="time-filter">
+                {[1, 2, 7].map((days) => (
+                  <label key={days} className="filter-option">
+                    <input
+                      type="checkbox"
+                      name="time-left"
+                      checked={endingWithinDays === days}
+                      onChange={() =>
+                        setEndingWithinDays(endingWithinDays === days ? null : days)
+                      }
+                    />
+                    Ends in {days} {days === 1 ? 'day' : 'days'}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            </div>
 
           {freeLoad.state === 'ok' && (
             <button
