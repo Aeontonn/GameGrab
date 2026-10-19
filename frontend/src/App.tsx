@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Account from './Account'
 import { API_URL, fetchFreeGames, fetchOffers } from './api'
+import { openInApp } from './appLink'
 import { STORES } from './types'
 import type { FreeGame, Offer } from './types'
 
@@ -388,7 +389,12 @@ function App() {
                   <ul className="free-games">
                     {visibleFree.map((game) => (
                       <li key={game.id}>
-                        <a href={game.claim_url} target="_blank" rel="noopener noreferrer">
+                        <a
+                          href={game.claim_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(event) => openInApp(event, 'Steam', game.steam_app_id, game.claim_url)}
+                        >
                           {game.title}
                         </a>
                         {game.genres.length > 0 && (
@@ -521,6 +527,9 @@ function App() {
                   href={selectedOffer.claim_url}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={(event) =>
+                    openInApp(event, selectedOffer.store, selectedOffer.steam_app_id, selectedOffer.claim_url)
+                  }
                   className="primary-button"
                   style={{ textAlign: 'center', padding: '7px 10px', fontSize: '13px' }}
                 >
