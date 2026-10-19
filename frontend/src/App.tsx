@@ -4,159 +4,82 @@ import { API_URL, fetchFreeGames, fetchOffers } from './api'
 import { STORES } from './types'
 import type { FreeGame, Offer } from './types'
 
-// Checks the value if it's unchecked, unchecks it if it's already selected.
 const toggle = (list: string[], value: string) =>
   list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 
-// The text that shows how long the offer lasts, or null if the store doesn't
-// provide an end date. Counts whole days ahead, so "2 days left" means there
-// are at least 2 full days left – and on the last day we say hours, because
-// "0 days left" sounds like it has already ended.
 const timeLeft = (endsAt: string | null): string | null => {
   if (!endsAt) return null
-
   const msLeft = new Date(endsAt).getTime() - Date.now()
   if (msLeft <= 0) return 'Ending soon'
-
   const hours = Math.floor(msLeft / 3_600_000)
   if (hours < 24) return hours <= 1 ? 'Less than 1 hour left' : `${hours} hours left`
-
   const days = Math.floor(hours / 24)
   return days === 1 ? '1 day left' : `${days} days left`
 }
 
-// The "Ends within 2 days" option shows offers that expire within this many days.
-// With 7 days nearly every offer was included, so the option said nothing.
-
 const withoutRequirementLabel = (value: string): string =>
   value.replace(/^(Minimum|Recommended):\s*/i, '')
 
-// How many offers are shown per page.
 const ITEMS_PER_PAGE = 40
 
-// One offer as a card.
-function OfferCard({ offer }: { offer: Offer }) {
-  const left = timeLeft(offer.ends_at)
-  const [copied, setCopied] = useState(false)
-  const [requirementsOpen, setRequirementsOpen] = useState(false)
+function OfferCard({ offer, onClick }: { offer: Offer; onClick: () => void }) {
+  const shortDescription = offer.description
+    ? offer.description.split('.')[0].trim() + '.'
+    : null
 
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(offer.claim_url)
-      setCopied(true)
-
-      setTimeout(() => {
-        setCopied(false)
-      }, 2000)
-    } catch (error) {
-      console.error('Could not copy link:', error)
-    }
-  }
+  const hasReviews =
+    offer.review_positive_percent !== null &&
+    offer.review_total !== null &&
+    offer.review_total > 0 &&
+    offer.review_source
 
   return (
-    <li>
+    <li onClick={onClick} style={{ cursor: 'pointer' }}>
       {offer.thumb && <img className="game-image" src={offer.thumb} alt={offer.title} />}
-
       <span className="store">{offer.store}</span>
-
       <h3>{offer.title}</h3>
-
       {offer.launcher_notice && (
         <p className="launcher-warning">⚠ Also requires: {offer.launcher_notice}</p>
       )}
-
-      {offer.genres.length > 0 && <p className="genres">{offer.genres.join(' · ')}</p>}
-
-      {offer.review_positive_percent !== null &&
-        offer.review_total !== null &&
-        offer.review_total > 0 &&
-        offer.review_source && (
-          <p className="game-reviews">
-            <strong>{Math.round(offer.review_positive_percent)}% positive</strong>
-            {' · '}
-            {offer.review_total.toLocaleString('en-US')} reviews on {offer.review_source}
-          </p>
-        )}
-
-      {offer.description && (
-        <p className="description">{offer.description}</p>
+      {offer.genres.length > 0 && (
+        <p className="genres" style={{ fontWeight: 600 }}>
+          {offer.genres.join(' · ')}
+        </p>
       )}
-
-      {(offer.minimum_requirements || offer.recommended_requirements) && (
-        <div className="system-requirements">
-          <button
-            type="button"
-            className="requirements-button"
-            onClick={() => setRequirementsOpen((current) => !current)}
-            aria-expanded={requirementsOpen}
-          >
-
-            <span>System requirements</span>
-            <span aria-hidden="true">{requirementsOpen ? '−' : '+'}</span>
-          </button>
-
-          {requirementsOpen && (
-            <div className="requirements-content">
-              {offer.minimum_requirements && (
-                <div>
-                  <h4>Minimum</h4>
-                  <p>{withoutRequirementLabel(offer.minimum_requirements)}</p>
-                </div>
-              )}
-
-              {offer.recommended_requirements && (
-                <div>
-                  <h4>Recommended</h4>
-                  <p>{withoutRequirementLabel(offer.recommended_requirements)}</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+      {shortDescription && (
+        <p className="description">{shortDescription}</p>
       )}
-
+      {hasReviews && (
+        <p className="game-reviews" style={{ color: 'var(--text-dim)', fontWeight: 600, margin: '4px 0 8px' }}>
+          {Math.round(offer.review_positive_percent!)}% positive
+          {' · '}
+          {offer.review_total!.toLocaleString('en-US')} reviews on {offer.review_source}
+        </p>
+      )}
       <p className="price">
         {offer.is_free ? (
           <>
             <s>${offer.normal_price.toFixed(2)}</s>{' '}
-            <strong>Free right now</strong>
+            <strong style={{ color: 'var(--ok)' }}>Free right now</strong>
           </>
         ) : (
           <>
             <s>${offer.normal_price.toFixed(2)}</s>{' '}
-            ${offer.sale_price.toFixed(2)}
+            <span style={{ color: 'var(--ok)' }}>${offer.sale_price.toFixed(2)}</span>
           </>
         )}{' '}
         <span className="savings">−{Math.round(offer.savings)}%</span>
       </p>
-
-      {left && <p className="time-left">{left}</p>}
-
-      <div className="offer-actions">
-        {/* Leaves the site, so we open in a new tab. */}
-        <a href={offer.claim_url} target="_blank" rel="noopener noreferrer">
-          Get it on {offer.store} →
-        </a>
-
-        <button
-          type="button"
-          className="share-button"
-          onClick={copyLink}
-        >
-          {copied ? 'Copied!' : 'Copy link'}
-        </button>
-      </div>
+      <p className="time-left" style={{ margin: 0 }}>Ending soon</p>
     </li>
   )
 }
 
-// The states the page can be in while it fetches offers.
 type Load =
   | { state: 'loading' }
   | { state: 'ok'; offers: Offer[] }
   | { state: 'error'; message: string }
 
-// "Always free" loads separately, so an error there doesn't take down the offers.
 type FreeLoad =
   | { state: 'loading' }
   | { state: 'ok'; games: FreeGame[] }
@@ -165,32 +88,18 @@ type FreeLoad =
 function App() {
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [freeLoad, setFreeLoad] = useState<FreeLoad>({ state: 'loading' })
-
-  // The time the page was opened. Decides what counts as "ending soon".
   const [openedAt] = useState(() => Date.now())
-
-  // Which stores are checked. An empty list means "show all".
   const [stores, setStores] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [showTimeFilter, setShowTimeFilter] = useState(false)
-
-  // Which genres are checked. An empty list means "show all".
   const [genres, setGenres] = useState<string[]>([])
-
-  // Whether only offers ending soon should be shown. Off by default – the
-  // visitor has to actively choose it.
   const [endingWithinDays, setEndingWithinDays] = useState<number | null>(null)
-
-  // Whether the filters are expanded. Only matters on mobile – on a wide screen
-  // the filters are always shown in the sidebar.
   const [filtersOpen, setFiltersOpen] = useState(false)
-
-  // Whether the page is scrolled to the top. On mobile the "Top" button is
-  // hidden there, since it would only cover the content.
   const [atTop, setAtTop] = useState(true)
-
-  // Which page of the offers is shown, starting at 1.
   const [currentPage, setCurrentPage] = useState(1)
+  const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null)
+  const [requirementsOpen, setRequirementsOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     const onScroll = () => setAtTop(window.scrollY < 400)
@@ -198,7 +107,6 @@ function App() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Runs once when the page loads: fetch the offers from the backend.
   useEffect(() => {
     fetchOffers()
       .then((offers) => setLoad({ state: 'ok', offers }))
@@ -211,19 +119,32 @@ function App() {
       .catch(() => setFreeLoad({ state: 'error' }))
   }, [])
 
-  // A new filter or search gives a new list, so we start over from page 1.
   useEffect(() => {
     setCurrentPage(1)
   }, [stores, genres, endingWithinDays, searchTerm])
+
+  useEffect(() => {
+    const html = document.documentElement
+    if (selectedOffer) {
+      html.style.overflow = 'hidden'
+    } else {
+      html.style.overflow = ''
+      setRequirementsOpen(false)
+    }
+    return () => {
+      html.style.overflow = ''
+    }
+  }, [selectedOffer])
+
+  useEffect(() => {
+    document.documentElement.style.scrollbarGutter = 'stable'
+  }, [])
 
   const freeGames = useMemo(
     () => (freeLoad.state === 'ok' ? freeLoad.games : []),
     [freeLoad],
   )
 
-  // The genres that actually exist among the games, in alphabetical order. Taken
-  // from the data instead of being hardcoded, so the filter never shows a genre
-  // that has no games. Applies to both sections.
   const allGenres = useMemo(() => {
     const offers = load.state === 'ok' ? load.offers : []
     const found = new Set([
@@ -233,23 +154,13 @@ function App() {
     return [...found].sort((a, b) => a.localeCompare(b, 'en'))
   }, [load, freeGames])
 
-  // The search field matches on the title, case-insensitively.
   const matchesSearch = useCallback(
     (title: string) => title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
     [searchTerm],
   )
 
-  // A game is shown if it matches any of the selected stores and any of the
-  // selected genres. An empty group doesn't filter at all.
-  //
-  // With "Ends within 2 days" checked, only offers with a known end date
-  // within the limit are shown.
-  // The limit follows what the card shows: everything shown as "2 days left"
-  // or less should be included. The card rounds down, so 2 days and 8 hours
-  // shows as "2 days left" – that's why the limit is one extra day.
   const visible = useMemo(() => {
     if (load.state !== 'ok') return []
-
     const filtered = load.offers.filter(
       (offer) =>
         (stores.length === 0 || stores.includes(offer.store)) &&
@@ -257,26 +168,20 @@ function App() {
         matchesSearch(offer.title),
     )
     if (endingWithinDays === null) return filtered
-
     const limit = openedAt + endingWithinDays * 24 * 3_600_000
     return filtered.filter(
       (offer) => offer.ends_at && new Date(offer.ends_at).getTime() < limit,
     )
   }, [load, stores, genres, endingWithinDays, openedAt, matchesSearch])
 
-  // The page number is capped to the last page, in case the list gets shorter
-  // than the page we're on.
   const totalPages = Math.max(1, Math.ceil(visible.length / ITEMS_PER_PAGE))
   const safePage = Math.min(currentPage, totalPages)
 
-  // Only the offers on the current page are shown.
   const paginatedOffers = useMemo(() => {
     const start = (safePage - 1) * ITEMS_PER_PAGE
     return visible.slice(start, start + ITEMS_PER_PAGE)
   }, [visible, safePage])
 
-  // The genre filter also applies to "Always free". The store filter doesn't,
-  // since nearly all of those games are on Steam.
   const visibleFree = useMemo(
     () =>
       freeGames.filter(
@@ -289,6 +194,16 @@ function App() {
 
   const activeFilters = stores.length + genres.length + (endingWithinDays !== null ? 1 : 0)
   const anyFilter = activeFilters > 0
+
+  const copyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   if (load.state === 'loading') {
     return <p className="status">Fetching offers…</p>
@@ -311,14 +226,11 @@ function App() {
           <h1>GameGrab</h1>
           <p>Free and discounted PC games, all in one place.</p>
         </div>
-
         <Account />
       </header>
 
       <div className="layout">
         <aside>
-          {/* Only shown on mobile, where the filters would otherwise fill the
-              whole first screen before any games are visible. */}
           <button
             type="button"
             className="filter-toggle"
@@ -366,7 +278,6 @@ function App() {
             >
               Show all
             </button>
-
           </div>
         </aside>
 
@@ -374,26 +285,17 @@ function App() {
           <h2>Free and on sale</h2>
           <div className="search-bar">
             <span className="search-icon">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-              >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                 <circle cx="10.5" cy="10.5" r="7.5" />
                 <line x1="16" y1="16" x2="22.5" y2="22.5" />
               </svg>
             </span>
-
             <input
               type="search"
               placeholder="Search for games..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-
             <button
               className="search-action"
               type="button"
@@ -401,7 +303,6 @@ function App() {
             >
               ☰
             </button>
-
             {showTimeFilter && (
               <div className="time-filter">
                 {[1, 7].map((days) => (
@@ -419,17 +320,14 @@ function App() {
                 ))}
               </div>
             )}
-
-            </div>
+          </div>
 
           {freeLoad.state === 'ok' && (
             <button
               type="button"
               className="jump-button"
               onClick={() =>
-                document
-                  .getElementById('always-free')
-                  ?.scrollIntoView({ behavior: 'smooth' })
+                document.getElementById('always-free')?.scrollIntoView({ behavior: 'smooth' })
               }
             >
               Jump to free to play games ↓
@@ -445,12 +343,10 @@ function App() {
 
           <ul className="offers">
             {paginatedOffers.map((offer) => (
-              <OfferCard key={offer.id} offer={offer} />
+              <OfferCard key={offer.id} offer={offer} onClick={() => setSelectedOffer(offer)} />
             ))}
           </ul>
 
-          {/* Only shown when there is more than one page. Scrolls to the top
-              so the visitor sees the first card of the new page. */}
           {totalPages > 1 && (
             <div className="pagination">
               <button
@@ -463,11 +359,9 @@ function App() {
               >
                 ← Previous
               </button>
-
               <span className="page-indicator">
                 {safePage} / {totalPages}
               </span>
-
               <button
                 type="button"
                 onClick={() => {
@@ -484,7 +378,6 @@ function App() {
           {freeLoad.state !== 'loading' && (
             <section className="always-free" id="always-free">
               <h2>Popular free games</h2>
-
               {freeLoad.state === 'error' ? (
                 <p className="error">Couldn't fetch the list of free games.</p>
               ) : (
@@ -492,7 +385,6 @@ function App() {
                   <p className="count">
                     <strong>{visibleFree.length}</strong> free to play games
                   </p>
-
                   <ul className="free-games">
                     {visibleFree.map((game) => (
                       <li key={game.id}>
@@ -512,7 +404,6 @@ function App() {
         </main>
       </div>
 
-      {/* In the corner. Always visible on a wide screen, only after scrolling on mobile. */}
       <button
         type="button"
         className={atTop ? 'to-top-button at-top' : 'to-top-button'}
@@ -521,6 +412,133 @@ function App() {
       >
         ↑ Top
       </button>
+
+      {selectedOffer && (
+        <div className="modal-overlay" onClick={() => setSelectedOffer(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', overflow: 'visible' }}>
+            <button className="modal-close" onClick={() => setSelectedOffer(null)} aria-label="Close">
+              ×
+            </button>
+            {selectedOffer.thumb && (
+              <img className="modal-image" src={selectedOffer.thumb} alt={selectedOffer.title} style={{ height: '110px' }} />
+            )}
+            <div className="modal-content" style={{ padding: '12px 14px' }}>
+              <span className="store" style={{ fontSize: '11px' }}>{selectedOffer.store}</span>
+              <h2 style={{ fontSize: '17px', margin: '2px 0 6px' }}>{selectedOffer.title}</h2>
+
+              {selectedOffer.genres.length > 0 && (
+                <p style={{ margin: '4px 0', fontSize: '12px' }}>
+                  <strong style={{ color: 'var(--text)' }}>Genres</strong>{' '}
+                  <span style={{ color: 'var(--text-dim)' }}>{selectedOffer.genres.join(' · ')}</span>
+                </p>
+              )}
+
+              {selectedOffer.description && (
+                <>
+                  <p style={{ margin: '8px 0 2px', fontWeight: 600, color: 'var(--text)', fontSize: '12px' }}>Description</p>
+                  <p className="description" style={{ fontSize: '12px', margin: '0 0 6px', lineHeight: 1.35 }}>{selectedOffer.description}</p>
+                </>
+              )}
+
+              {selectedOffer.review_positive_percent !== null &&
+                selectedOffer.review_total !== null &&
+                selectedOffer.review_total > 0 &&
+                selectedOffer.review_source && (
+                  <p style={{ color: 'var(--text-dim)', fontWeight: 600, fontSize: '12px', margin: '6px 0' }}>
+                    {Math.round(selectedOffer.review_positive_percent)}% positive
+                    {' · '}
+                    {selectedOffer.review_total.toLocaleString('en-US')} reviews on {selectedOffer.review_source}
+                  </p>
+                )}
+
+              {(selectedOffer.minimum_requirements || selectedOffer.recommended_requirements) && (
+                <div style={{ marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setRequirementsOpen((v) => !v)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text)',
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                      padding: '4px 0',
+                    }}
+                  >
+                    <span>System requirements</span>
+                    <span>{requirementsOpen ? '−' : '+'}</span>
+                  </button>
+                  {requirementsOpen && (
+                    <div className="requirements-content" style={{ marginTop: '4px', fontSize: '11px', maxHeight: '50px', overflowY: 'auto' }}>
+                      {selectedOffer.minimum_requirements && (
+                        <div>
+                          <h4>Minimum</h4>
+                          <p>{withoutRequirementLabel(selectedOffer.minimum_requirements)}</p>
+                        </div>
+                      )}
+                      {selectedOffer.recommended_requirements && (
+                        <div>
+                          <h4>Recommended</h4>
+                          <p>{withoutRequirementLabel(selectedOffer.recommended_requirements)}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                <div style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '6px', padding: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '2px' }}>Price</div>
+                  <p className="price" style={{ margin: 0, fontSize: '12px' }}>
+                    {selectedOffer.is_free ? (
+                      <>
+                        <s>${selectedOffer.normal_price.toFixed(2)}</s>{' '}
+                        <strong style={{ color: 'var(--ok)' }}>Free right now</strong>
+                      </>
+                    ) : (
+                      <>
+                        <s>${selectedOffer.normal_price.toFixed(2)}</s>{' '}
+                        <span style={{ color: 'var(--ok)' }}>${selectedOffer.sale_price.toFixed(2)}</span>
+                      </>
+                    )}{' '}
+                    <span className="savings">−{Math.round(selectedOffer.savings)}%</span>
+                  </p>
+                </div>
+                <div style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '6px', padding: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '2px' }}>Time Left</div>
+                  <div style={{ fontWeight: 600, fontSize: '12px' }}>{timeLeft(selectedOffer.ends_at) || '—'}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
+                <a
+                  href={selectedOffer.claim_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="primary-button"
+                  style={{ textAlign: 'center', padding: '7px 10px', fontSize: '13px' }}
+                >
+                  Get it on {selectedOffer.store} →
+                </a>
+                <button
+                  type="button"
+                  className="share-button"
+                  onClick={() => copyLink(selectedOffer.claim_url)}
+                  style={{ width: '100%', padding: '7px 10px', fontSize: '13px' }}
+                >
+                  {copied ? 'Copied!' : 'Copy link'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
