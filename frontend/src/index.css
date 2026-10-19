@@ -787,4 +787,77 @@ main > h2 {
 .game-reviews strong {
   color: inherit;
   font-weight: 600;
+
+}
+
+/* Separate limited-time free offers from discounted games */
+.limited-free {
+  margin-bottom: 3rem;
+}
+
+.limited-free > p {
+  color: #999;
+  margin-bottom: 1rem;
+}
+
+.discounted-games {
+  margin-top: 1rem;
+}
+
+/* Free-to-Play preview on the homepage */
+.free-to-play-preview {
+  background: #1b1d25;
+  border: 1px solid #2b2e38;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin: 1.5rem 0 2.5rem;
+}
+
+.free-to-play-preview-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.free-to-play-preview h2 {
+  font-size: 1.3rem;
+  margin: 0 0 0.5rem;
+}
+
+.free-to-play-preview p {
+  color: #999;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.free-to-play-button {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: #2b303b;
+  border: 1px solid #454b59;
+  border-radius: 6px;
+  color: #fff;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.free-to-play-arrow {
+  font-size: 1rem;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.free-to-play-button:hover {
+  background: #373d4a;
+}
+
+@media (max-width: 600px) {
+  .free-to-play-preview-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
 }

@@ -175,13 +175,23 @@ function App() {
     )
   }, [load, stores, genres, endingWithinDays, openedAt, matchesSearch])
 
-  const totalPages = Math.max(1, Math.ceil(visible.length / ITEMS_PER_PAGE))
+  // Separate temporarily free offers from discounted games.
+  const freeOffers = visible.filter((offer) => offer.is_free)
+  const discountedOffers = visible.filter((offer) => !offer.is_free)
+
+  // Pagination only applies to discounted games.
+  const totalPages = Math.max(
+    1,
+    Math.ceil(discountedOffers.length / ITEMS_PER_PAGE),
+  )
+
   const safePage = Math.min(currentPage, totalPages)
 
-  const paginatedOffers = useMemo(() => {
-    const start = (safePage - 1) * ITEMS_PER_PAGE
-    return visible.slice(start, start + ITEMS_PER_PAGE)
-  }, [visible, safePage])
+  // Only show discounted games from the current page.
+  const paginatedOffers = discountedOffers.slice(
+    (safePage - 1) * ITEMS_PER_PAGE,
+    safePage * ITEMS_PER_PAGE,
+  )
 
   const visibleFree = useMemo(
     () =>
@@ -323,30 +333,77 @@ function App() {
             )}
           </div>
 
-          {freeLoad.state === 'ok' && (
-            <button
-              type="button"
-              className="jump-button"
-              onClick={() =>
-                document.getElementById('always-free')?.scrollIntoView({ behavior: 'smooth' })
-              }
-            >
-              Jump to free to play games ↓
-            </button>
-          )}
+          <section className="free-to-play-preview">
+            <div className="free-to-play-preview-content">
+              <div>
+                <h2>Free-to-Play games</h2>
+                <p>
+                  Discover games that are always free to play,
+                  not just temporarily free.
+                </p>
+              </div>
 
-          <p className="count">
-            <strong>{visible.length}</strong>{' '}
-            {endingWithinDays !== null
-              ? `offers ending within ${endingWithinDays} ${endingWithinDays === 1 ? 'day' : 'days'}`
-              : 'offers'}
-          </p>
+              <button
+                type="button"
+                className="free-to-play-button"
+                onClick={() =>
+                  document
+                    .getElementById('always-free')
+                    ?.scrollIntoView({ behavior: 'smooth' })
+                }
+              >
+                <span>Explore Free-to-Play</span>
+                <span className="free-to-play-arrow" aria-hidden="true">↓</span>
+              </button>
+            </div>
+          </section>
+
+          {/* Temporarily free offers */}
+          <section className="limited-free">
+            <h2>Free for a limited time</h2>
+            <p>Games that are temporarily free to claim.</p>
+
+            {freeOffers.length > 0 ? (
+              <ul className="offers">
+                {freeOffers.map((offer) => (
+                  <OfferCard
+                  key={offer.id}
+                  offer={offer}
+                  onClick={() => setSelectedOffer(offer)}
+                  />
+                ))}
+              </ul>
+            ) : (
+              <p className="count">
+                {searchTerm.trim() || anyFilter
+                  ? 'No free offers match your search or filters.'
+                  : 'No current free offers. Check back later!'}
+              </p>
+            )}
+          </section>
+
+        {/* Discounted games */}
+        <section className="discounted-games">
+          <h2>Discounted games</h2>
+
+          {discountedOffers.length > 0 ? (
+            <p className="count">
+              <strong>{discountedOffers.length}</strong> discounted games
+            </p>
+          ) : (
+            <p className="count">
+              {searchTerm.trim() || anyFilter
+                ? 'No discounted games match your search or filters.'
+                : 'No discounted games available right now.'}
+            </p>
+          )}
 
           <ul className="offers">
             {paginatedOffers.map((offer) => (
               <OfferCard key={offer.id} offer={offer} onClick={() => setSelectedOffer(offer)} />
             ))}
           </ul>
+        </section>
 
           {totalPages > 1 && (
             <div className="pagination">
@@ -383,9 +440,19 @@ function App() {
                 <p className="error">Couldn't fetch the list of free games.</p>
               ) : (
                 <>
-                  <p className="count">
-                    <strong>{visibleFree.length}</strong> free to play games
-                  </p>
+
+                  {visibleFree.length > 0 ? (
+                    <p className="count">
+                      <strong>{visibleFree.length}</strong> free to play games
+                    </p>
+                  ) : (
+                    <p className="count">
+                      {searchTerm.trim() || genres.length > 0
+                      ? 'No Free-to-Play games match your search or filters.'
+                      : 'No Free-to-Play games available right now.'}
+                    </p>
+                  )}
+
                   <ul className="free-games">
                     {visibleFree.map((game) => (
                       <li key={game.id}>
