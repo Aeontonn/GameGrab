@@ -404,7 +404,7 @@ function App() {
 
             {showTimeFilter && (
               <div className="time-filter">
-                {[1, 2, 7].map((days) => (
+                {[1, 7].map((days) => (
                   <label key={days} className="filter-option">
                     <input
                       type="checkbox"
