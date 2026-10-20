@@ -2,19 +2,23 @@
    The layout is still bare-bones – only the palette is in place. */
 
 :root {
-  --bg: #14151a;
-  --surface: #1b1d25;
-  --line: #23252f;
+  /* Backgrounds, lighter the closer they are to the viewer. */
+  --bg: #14151a; /* the page */
+  --surface: #1b1d25; /* the cards */
+  --line: #23252f; /* borders */
   --line-strong: #2d2f38;
 
-  --text: #edeef2;
-  --text-dim: #888e96;
-  --text-faint: #585d63;
+  /* Shades of white, from headings down to the least important. */
+  --text: #edeef2; /* headings and titles */
+  --text-dim: #888e96; /* store, prices, filter options */
+  --text-faint: #585d63; /* footnotes and technical info */
 
+  /* Status colors. Not part of the palette, but they carry information. */
   --ok: #4ade80;
   --error: #f87171;
   --warn: #fbbf24;
 
+  /* Makes the browser draw checkboxes and other controls dark. */
   color-scheme: dark;
 }
 
@@ -30,7 +34,7 @@ h1 {
   margin: 0 0 4px;
 }
 
-/* Header */
+/* Title on the left, the account on the right. */
 header {
   display: flex;
   justify-content: space-between;
@@ -46,7 +50,7 @@ header p {
   color: var(--text-dim);
 }
 
-/* Account */
+/* Login, or who is logged in. The form opens as a panel below the button. */
 .account {
   position: relative;
   display: flex;
@@ -120,6 +124,7 @@ header p {
   color: var(--text-faint);
 }
 
+/* Log in / Create account: the selected one is at full strength. */
 .auth-tabs {
   display: flex;
   gap: 8px;
@@ -146,7 +151,7 @@ header p {
   cursor: default;
 }
 
-/* Main layout */
+/* Main content now uses the full width. */
 .layout {
   display: grid;
   grid-template-columns: 1fr;
@@ -158,6 +163,69 @@ main {
   padding-left: 0;
 }
 
+/* The button that expands the filters. Only used on mobile, see the bottom of the file. */
+.filter-toggle {
+  display: none;
+}
+
+aside h2 {
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+
+/* Line above Genre */
+aside h2:nth-of-type(2) {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Space between the filter groups, for example before "Genre". */
+.filter-option + h2 {
+  margin-top: 12px;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  white-space: nowrap;
+  gap: 6px;
+  padding: 2px 0;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* The selected filter should stand out more than the unselected ones. */
+.filter-option:has(input:checked) {
+  color: var(--text);
+}
+
+aside button {
+  margin-top: 8px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+aside button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+/* "Time left" sits on its own below "Show all", with space above. */
+.time-filter {
+  margin-top: 0;
+  position: absolute;
+  right: 12px;
+  top: calc(100% + 10px);
+}
+
 .count {
   margin: 0 0 16px;
   color: var(--text-dim);
@@ -167,7 +235,6 @@ main {
   color: var(--text);
 }
 
-/* Offer cards */
 .offers {
   list-style: none;
   margin: 0;
@@ -184,6 +251,7 @@ main {
   padding: 12px;
 }
 
+/* The image shown at the top of each game card. */
 .game-image {
   width: 100%;
   height: 140px;
@@ -206,6 +274,7 @@ main {
   color: var(--text-faint);
 }
 
+/* The genres on the card: supporting info, as muted as the price. */
 .genres {
   margin: 0 0 8px;
   font-size: 13px;
@@ -225,7 +294,7 @@ main {
   overflow: hidden;
 }
 
-/* System requirements */
+/* Expandable system requirements on offer cards. */
 .system-requirements {
   margin: 0 0 10px;
 }
@@ -233,13 +302,16 @@ main {
 .requirements-button {
   width: 100%;
   padding: 7px 9px;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   background: transparent;
   color: var(--text-dim);
   border: 1px solid var(--line-strong);
   border-radius: 6px;
+
   font: inherit;
   font-size: 12px;
   text-align: left;
@@ -254,11 +326,14 @@ main {
 .requirements-content {
   max-height: 240px;
   overflow-y: auto;
+
   margin-top: 8px;
   padding: 10px;
+
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 6px;
+
   font-size: 12px;
   line-height: 1.45;
   color: var(--text-dim);
@@ -283,12 +358,12 @@ main {
   margin-bottom: 0;
 }
 
-/* Prices */
 .price {
   margin: 0 0 8px;
   color: var(--text-dim);
 }
 
+/* The struck-through regular price should fade behind the sale price. */
 .price s {
   color: var(--text-faint);
 }
@@ -303,6 +378,8 @@ main {
   color: var(--ok);
 }
 
+/* How long the offer lasts. Full strength, since that's what makes
+   people click now instead of later. */
 .time-left {
   margin: 0 0 8px;
   font-size: 13px;
@@ -310,6 +387,7 @@ main {
   color: var(--text);
 }
 
+/* The link is the most important click on the page, so it gets full strength. */
 .offers a {
   color: var(--text);
   text-decoration: none;
@@ -320,12 +398,14 @@ main {
   border-bottom-color: var(--text);
 }
 
+/* Actions at the bottom of each offer card. */
 .offer-actions {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
+/* Secondary action for copying the offer link. */
 .share-button {
   min-width: 72px;
   background: transparent;
@@ -343,11 +423,13 @@ main {
   border-color: var(--text-dim);
 }
 
-/* Loading / status */
 .status {
   padding: 24px;
 }
 
+/* Shown while the offers load. Centered on the screen with a slow pulse, so
+   it's clear something is happening during a long wait. The height leaves out
+   the body's padding, so the page doesn't scroll. */
 .splash {
   min-height: calc(100vh - 48px);
   min-height: calc(100dvh - 48px);
@@ -400,7 +482,7 @@ main > h2 {
   margin: 0 0 4px;
 }
 
-/* Free games */
+/* Smaller section below the offers: compact rows instead of cards. */
 .always-free {
   margin-top: 40px;
   padding-top: 24px;
@@ -453,7 +535,6 @@ main > h2 {
   color: var(--warn);
 }
 
-/* Navigation buttons */
 .jump-button,
 .to-top-button {
   background: var(--surface);
@@ -470,6 +551,7 @@ main > h2 {
   padding: 6px 12px;
 }
 
+/* Fixed to the viewport, so it stays on screen while scrolling. */
 .to-top-button {
   position: fixed;
   right: 24px;
@@ -484,7 +566,6 @@ main > h2 {
   border-color: var(--text-dim);
 }
 
-/* Search */
 .search-bar {
   display: flex;
   position: relative;
@@ -511,9 +592,12 @@ main > h2 {
 
 .search-bar input {
   width: 100%;
+
   border: none;
   outline: none;
+
   background: transparent;
+
   font-size: 1rem;
   color: #ffffff;
 }
@@ -526,10 +610,196 @@ main > h2 {
   border: 1px solid rgba(180, 200, 210, 0.35);
   background: rgba(93, 120, 138, 0.28);
   color: #eef3f4;
+
   padding: 8px 14px;
   border-radius: 6px;
+
   font-size: 0.9rem;
   cursor: pointer;
+}
+
+/* Full-screen filter menu. */
+.filter-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(14, 15, 19, 0.94);
+  backdrop-filter: blur(18px);
+  overflow: hidden;
+}
+
+.filter-menu {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 32px 48px;
+}
+
+.filter-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.filter-menu-header h1 {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.filter-close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  font: inherit;
+  font-size: 34px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.filter-menu-content {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  flex: 1;
+  min-height: 0;
+  padding: 28px 0;
+}
+
+.filter-menu-section {
+  min-width: 0;
+  padding: 0 36px;
+  overflow: visible;
+}
+
+.filter-menu-section:first-child {
+  padding-left: 0;
+}
+
+.filter-menu-section:last-child {
+  padding-right: 0;
+}
+
+.filter-menu-section + .filter-menu-section {
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.filter-menu-section h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+
+.filter-menu-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 38px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.filter-menu-option:has(input:checked) {
+  color: var(--text);
+}
+
+.filter-menu-option input {
+  flex-shrink: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.filter-store-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.store-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 24px;
+  flex-shrink: 0;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.store-logo-steam {
+  font-size: 20px;
+}
+
+.store-logo-gog {
+  font-size: 9px;
+  letter-spacing: -0.03em;
+}
+
+.store-logo-epic-games {
+  font-size: 8px;
+  line-height: 0.9;
+}
+
+.filter-menu-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.filter-menu-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.filter-clear,
+.filter-results {
+  min-height: 42px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.filter-clear {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--line-strong);
+}
+
+.filter-clear:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.filter-results {
+  background: var(--text);
+  color: var(--bg);
+  border: 1px solid var(--text);
+  font-weight: 700;
+}
+
+.filter-results:hover {
+  opacity: 0.9;
 }
 
 /* Pagination */
@@ -645,7 +915,98 @@ main > h2 {
   opacity: 0.9;
 }
 
-/* Reviews */
+/* Mobile. */
+@media (max-width: 700px) {
+  body {
+    padding: 16px 16px 88px;
+  }
+
+  .account-email {
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  main {
+    padding-left: 0;
+  }
+
+  .search-bar {
+    max-width: none;
+    margin: 12px 0 16px;
+    transform: none;
+    box-sizing: border-box;
+  }
+
+  .account button,
+  .jump-button,
+  .requirements-button,
+  .share-button {
+    min-height: 44px;
+  }
+
+  .filter-menu {
+    padding: 20px 16px;
+  }
+
+  .filter-menu-header {
+    padding-bottom: 18px;
+  }
+
+  .filter-menu-header h1 {
+    font-size: 26px;
+  }
+
+  .filter-menu-content {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+    padding: 18px 0;
+  }
+
+  .filter-menu-section,
+  .filter-menu-section:first-child,
+  .filter-menu-section:last-child {
+    padding: 18px 0;
+    overflow: visible;
+  }
+
+  .filter-menu-section:first-child {
+    padding-top: 0;
+  }
+
+  .filter-menu-section + .filter-menu-section {
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .filter-menu-option {
+    min-height: 44px;
+  }
+
+  .filter-menu-actions {
+    padding-top: 16px;
+  }
+
+  .offer-actions {
+    justify-content: space-between;
+  }
+
+  .to-top-button {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .to-top-button.at-top {
+    display: none;
+  }
+}
+
 .game-reviews {
   font-size: 0.85rem;
   color: #888;
@@ -657,7 +1018,7 @@ main > h2 {
   font-weight: 600;
 }
 
-/* Limited free / discounted */
+/* Separate limited-time free offers from discounted games */
 .limited-free {
   margin-bottom: 3rem;
 }
@@ -671,7 +1032,7 @@ main > h2 {
   margin-top: 1rem;
 }
 
-/* Free-to-Play preview */
+/* Free-to-Play preview on the homepage */
 .free-to-play-preview {
   background: #1b1d25;
   border: 1px solid #2b2e38;
@@ -719,360 +1080,6 @@ main > h2 {
 
 .free-to-play-button:hover {
   background: #373d4a;
-}
-
-/* Fullscreen filter menu */
-.filter-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-
-  width: 100vw;
-  height: 100vh;
-
-  background: rgba(14, 15, 19, 0.97);
-  backdrop-filter: blur(18px);
-
-  overflow: hidden;
-}
-
-.filter-menu {
-  width: 100%;
-  height: 100vh;
-  box-sizing: border-box;
-
-  display: flex;
-  flex-direction: column;
-
-  padding: 24px 48px;
-
-  color: var(--text);
-}
-
-.filter-menu-header {
-  flex-shrink: 0;
-
-  display: flex;
-  align-items: center;
-  gap: 18px;
-
-  padding-bottom: 18px;
-
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.filter-menu-header h1 {
-  margin: 0;
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text);
-}
-
-.filter-close {
-  width: 40px;
-  height: 40px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  padding: 0;
-
-  background: transparent;
-  border: none;
-
-  color: var(--text);
-
-  font-family: inherit;
-  font-size: 34px;
-  font-weight: 300;
-  line-height: 1;
-
-  cursor: pointer;
-}
-
-.filter-close:hover {
-  opacity: 0.7;
-}
-
-.filter-menu-content {
-  flex: 1;
-  min-height: 0;
-
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-
-  margin-top: 20px;
-}
-
-.filter-menu-section {
-  min-width: 0;
-  min-height: 0;
-
-  padding: 0 42px;
-
-  overflow-y: auto;
-}
-
-.filter-menu-section:first-child {
-  padding-left: 0;
-}
-
-.filter-menu-section:last-child {
-  padding-right: 0;
-}
-
-.filter-menu-section + .filter-menu-section {
-  border-left: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.filter-menu-section h2 {
-  margin: 0 0 14px;
-
-  font-size: 22px;
-  font-weight: 600;
-
-  color: var(--text);
-}
-
-.filter-menu-option {
-  min-height: 38px;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  gap: 20px;
-
-  box-sizing: border-box;
-
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-
-  color: var(--text);
-
-  font-size: 15px;
-  font-weight: 400;
-
-  cursor: pointer;
-}
-
-.filter-menu-option:first-of-type {
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.filter-menu-option span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.filter-menu-option input[type='checkbox'] {
-  width: 17px;
-  height: 17px;
-
-  flex-shrink: 0;
-
-  margin: 0;
-
-  cursor: pointer;
-}
-
-/* Bottom filter buttons */
-.filter-menu-actions {
-  flex-shrink: 0;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  margin-top: 18px;
-  padding-top: 18px;
-
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.filter-menu-actions-right {
-  display: flex;
-  align-items: center;
-  margin-left: auto;
-}
-
-.filter-clear,
-.filter-results {
-  min-height: 42px;
-  padding: 9px 20px;
-
-  border-radius: 4px;
-
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-
-  cursor: pointer;
-}
-
-.filter-clear {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: var(--text);
-}
-
-.filter-clear:hover {
-  border-color: rgba(255, 255, 255, 0.55);
-}
-
-.filter-results {
-  background: #edeef2;
-  border: 1px solid #edeef2;
-  color: #14151a;
-}
-
-.filter-results:hover {
-  opacity: 0.88;
-}
-
-/* Make filter overlay escape the search bar */
-.search-bar .filter-overlay {
-  position: fixed;
-  inset: 0;
-
-  width: 100vw;
-  height: 100vh;
-  max-width: none;
-
-  margin: 0;
-  padding: 0;
-
-  z-index: 9999;
-
-  background: rgba(14, 15, 19, 0.97);
-  backdrop-filter: blur(18px);
-
-  border: none;
-  border-radius: 0;
-
-  display: block;
-}
-
-.search-bar .filter-menu {
-  width: 100%;
-  height: 100vh;
-  min-height: 0;
-
-  box-sizing: border-box;
-
-  display: flex;
-  flex-direction: column;
-
-  padding: 24px 48px;
-}
-
-/* Mobile */
-@media (max-width: 700px) {
-  body {
-    padding: 16px 16px 88px;
-  }
-
-  .account-email {
-    max-width: 40vw;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .layout {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-
-  main {
-    padding-left: 0;
-  }
-
-  .search-bar {
-    max-width: none;
-    margin: 12px 0 16px;
-    transform: none;
-    box-sizing: border-box;
-  }
-
-  .account button,
-  .jump-button,
-  .requirements-button,
-  .share-button {
-    min-height: 44px;
-  }
-
-  .offer-actions {
-    justify-content: space-between;
-  }
-
-  .to-top-button {
-    right: 16px;
-    bottom: 16px;
-  }
-
-  .to-top-button.at-top {
-    display: none;
-  }
-}
-
-@media (max-width: 800px) {
-  .filter-overlay {
-    overflow-y: auto;
-  }
-
-  .filter-menu {
-    height: auto;
-    min-height: 100vh;
-
-    padding: 20px 24px;
-  }
-
-  .filter-menu-header {
-    padding-bottom: 16px;
-  }
-
-  .filter-menu-header h1 {
-    font-size: 26px;
-  }
-
-  .filter-menu-content {
-    display: grid;
-    grid-template-columns: 1fr;
-
-    margin-top: 16px;
-
-    overflow: visible;
-  }
-
-  .filter-menu-section,
-  .filter-menu-section:first-child,
-  .filter-menu-section:last-child {
-    padding: 20px 0;
-
-    overflow: visible;
-  }
-
-  .filter-menu-section + .filter-menu-section {
-    border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
-  }
-
-  .filter-menu-section h2 {
-    margin-bottom: 12px;
-  }
-
-  .filter-menu-actions {
-    margin-top: 16px;
-    padding-top: 16px;
-  }
-
-  .search-bar .filter-menu {
-    height: auto;
-    min-height: 100vh;
-    padding: 20px 24px;
-  }
 }
 
 @media (max-width: 600px) {

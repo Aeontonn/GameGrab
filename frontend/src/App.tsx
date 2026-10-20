@@ -23,6 +23,21 @@ const withoutRequirementLabel = (value: string): string =>
 
 const ITEMS_PER_PAGE = 40
 
+const FILTER_GENRES = [
+  'Action',
+  'Adventure',
+  'Casual',
+  'Indie',
+  'RPG',
+  'Simulation',
+  'Sports',
+  'Strategy',
+  'Racing',
+]
+
+// How long the mouse has to rest on a card before its details are fetched.
+// Short enough to finish before most clicks, long enough that just moving the
+// mouse across the grid doesn't fetch every card it passes.
 const PREFETCH_DELAY_MS = 120
 
 function OfferCard({
@@ -40,7 +55,6 @@ function OfferCard({
     window.clearTimeout(prefetchTimer.current)
     prefetchTimer.current = window.setTimeout(onPrefetch, PREFETCH_DELAY_MS)
   }
-
   const cancelPrefetch = () => window.clearTimeout(prefetchTimer.current)
 
   useEffect(() => cancelPrefetch, [])
@@ -54,50 +68,36 @@ function OfferCard({
   return (
     <li
       onClick={onClick}
+      // Fetches the details while the mouse rests on the card, so they're
+      // usually there before the window opens.
       onMouseEnter={startPrefetch}
       onMouseLeave={cancelPrefetch}
       style={{ cursor: 'pointer' }}
     >
-      {offer.thumb && (
-        <img className="game-image" src={offer.thumb} alt={offer.title} />
-      )}
-
+      {offer.thumb && <img className="game-image" src={offer.thumb} alt={offer.title} />}
       <span className="store">{offer.store}</span>
-
       <h3>{offer.title}</h3>
-
       {offer.launcher_notice && (
-        <p className="launcher-warning">
-          ⚠ Also requires: {offer.launcher_notice}
-        </p>
+        <p className="launcher-warning">⚠ Also requires: {offer.launcher_notice}</p>
       )}
-
       {offer.genres.length > 0 && (
         <p className="genres" style={{ fontWeight: 600 }}>
           {offer.genres.join(' · ')}
         </p>
       )}
-
       {offer.short_description && (
         <p className="description">{offer.short_description}</p>
       )}
-
       {hasReviews && (
         <p
           className="game-reviews"
-          style={{
-            color: 'var(--text-dim)',
-            fontWeight: 600,
-            margin: '4px 0 8px',
-          }}
+          style={{ color: 'var(--text-dim)', fontWeight: 600, margin: '4px 0 8px' }}
         >
           {Math.round(offer.review_positive_percent!)}% positive
           {' · '}
-          {offer.review_total!.toLocaleString('en-US')} reviews on{' '}
-          {offer.review_source}
+          {offer.review_total!.toLocaleString('en-US')} reviews on {offer.review_source}
         </p>
       )}
-
       <p className="price">
         {offer.is_free ? (
           <>
@@ -107,17 +107,12 @@ function OfferCard({
         ) : (
           <>
             <s>${offer.normal_price.toFixed(2)}</s>{' '}
-            <span style={{ color: 'var(--ok)' }}>
-              ${offer.sale_price.toFixed(2)}
-            </span>
+            <span style={{ color: 'var(--ok)' }}>${offer.sale_price.toFixed(2)}</span>
           </>
         )}{' '}
         <span className="savings">−{Math.round(offer.savings)}%</span>
       </p>
-
-      <p className="time-left" style={{ margin: 0 }}>
-        Ending soon
-      </p>
+      <p className="time-left" style={{ margin: 0 }}>Ending soon</p>
     </li>
   )
 }
@@ -144,10 +139,9 @@ function App() {
   const [atTop, setAtTop] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null)
-  const [details, setDetails] = useState<
-    OfferDetails | 'loading' | 'error'
-  >('loading')
-
+  const [details, setDetails] = useState<OfferDetails | 'loading' | 'error'>('loading')
+  // Finished details by offer id, and requests still on their way, so hovering
+  // and then clicking the same card only asks the backend once.
   const detailsCache = useRef(new Map<number, OfferDetails>())
   const detailsRequests = useRef(new Map<number, Promise<OfferDetails>>())
   const [slowStart, setSlowStart] = useState(false)
@@ -156,26 +150,23 @@ function App() {
 
   useEffect(() => {
     const onScroll = () => setAtTop(window.scrollY < 400)
-
     window.addEventListener('scroll', onScroll, { passive: true })
-
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // The backend sleeps on Render's free plan when nobody has used it for a while,
+  // and waking it up takes up to a minute. If the offers haven't come after a few
+  // seconds, the loading screen says so, so it doesn't look like the page is broken.
   useEffect(() => {
     if (load.state !== 'loading') return
-
     const timer = window.setTimeout(() => setSlowStart(true), 5000)
-
     return () => window.clearTimeout(timer)
   }, [load.state])
 
   useEffect(() => {
     fetchOffers()
       .then((offers) => setLoad({ state: 'ok', offers }))
-      .catch((error: Error) =>
-        setLoad({ state: 'error', message: error.message }),
-      )
+      .catch((error: Error) => setLoad({ state: 'error', message: error.message }))
   }, [])
 
   useEffect(() => {
@@ -184,46 +175,41 @@ function App() {
       .catch(() => setFreeLoad({ state: 'error' }))
   }, [])
 
-  const loadDetails = useCallback(
-    (id: number): Promise<OfferDetails> => {
-      const saved = detailsCache.current.get(id)
+  // Starts fetching an offer's details, unless they're already here or on their way.
+  const loadDetails = useCallback((id: number): Promise<OfferDetails> => {
+    const saved = detailsCache.current.get(id)
+    if (saved) return Promise.resolve(saved)
 
-      if (saved) return Promise.resolve(saved)
+    let request = detailsRequests.current.get(id)
+    if (!request) {
+      request = fetchOfferDetails(id)
+        .then((fetched) => {
+          detailsCache.current.set(id, fetched)
+          return fetched
+        })
+        .finally(() => detailsRequests.current.delete(id))
+      // A hover prefetch nobody waits for shouldn't show up as an uncaught error.
+      // The window handles the error itself if the game is opened.
+      request.catch(() => {})
+      detailsRequests.current.set(id, request)
+    }
+    return request
+  }, [])
 
-      let request = detailsRequests.current.get(id)
-
-      if (!request) {
-        request = fetchOfferDetails(id)
-          .then((fetched) => {
-            detailsCache.current.set(id, fetched)
-            return fetched
-          })
-          .finally(() => detailsRequests.current.delete(id))
-
-        request.catch(() => {})
-
-        detailsRequests.current.set(id, request)
-      }
-
-      return request
-    },
-    [],
-  )
-
+  // The full description and system requirements aren't part of /offers, so
+  // they're fetched when a game is hovered or opened. Saved, so opening the same
+  // game again is instant.
   useEffect(() => {
     if (!selectedOffer) return
-
     const saved = detailsCache.current.get(selectedOffer.id)
-
     if (saved) {
       setDetails(saved)
       return
     }
 
     setDetails('loading')
-
+    // Ignores the answer if another game was opened before it came.
     let current = true
-
     loadDetails(selectedOffer.id)
       .then((fetched) => {
         if (current) setDetails(fetched)
@@ -231,7 +217,6 @@ function App() {
       .catch(() => {
         if (current) setDetails('error')
       })
-
     return () => {
       current = false
     }
@@ -243,14 +228,12 @@ function App() {
 
   useEffect(() => {
     const html = document.documentElement
-
     if (selectedOffer) {
       html.style.overflow = 'hidden'
     } else {
       html.style.overflow = ''
       setRequirementsOpen(false)
     }
-
     return () => {
       html.style.overflow = ''
     }
@@ -265,50 +248,25 @@ function App() {
     [freeLoad],
   )
 
-  const allGenres = useMemo(() => {
-    const offers = load.state === 'ok' ? load.offers : []
-
-    const found = new Set([
-      ...offers.flatMap((offer) => offer.genres),
-      ...freeGames.flatMap((game) => game.genres),
-    ])
-
-    return [...found].sort((a, b) => a.localeCompare(b, 'en'))
-  }, [load, freeGames])
-
   const matchesSearch = useCallback(
-    (title: string) =>
-      title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
+    (title: string) => title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
     [searchTerm],
   )
 
   const visible = useMemo(() => {
     if (load.state !== 'ok') return []
-
     const filtered = load.offers.filter(
       (offer) =>
         (stores.length === 0 || stores.includes(offer.store)) &&
-        (genres.length === 0 ||
-          offer.genres.some((genre) => genres.includes(genre))) &&
+        (genres.length === 0 || offer.genres.some((genre) => genres.includes(genre))) &&
         matchesSearch(offer.title),
     )
-
     if (endingWithinDays === null) return filtered
-
     const limit = openedAt + endingWithinDays * 24 * 3_600_000
-
     return filtered.filter(
-      (offer) =>
-        offer.ends_at && new Date(offer.ends_at).getTime() < limit,
+      (offer) => offer.ends_at && new Date(offer.ends_at).getTime() < limit,
     )
-  }, [
-    load,
-    stores,
-    genres,
-    endingWithinDays,
-    openedAt,
-    matchesSearch,
-  ])
+  }, [load, stores, genres, endingWithinDays, openedAt, matchesSearch])
 
   const freeOffers = visible.filter((offer) => offer.is_free)
   const discountedOffers = visible.filter((offer) => !offer.is_free)
@@ -329,18 +287,13 @@ function App() {
     () =>
       freeGames.filter(
         (game) =>
-          (genres.length === 0 ||
-            game.genres.some((genre) => genres.includes(genre))) &&
+          (genres.length === 0 || game.genres.some((genre) => genres.includes(genre))) &&
           matchesSearch(game.title),
       ),
     [freeGames, genres, matchesSearch],
   )
 
-  const activeFilters =
-    stores.length +
-    genres.length +
-    (endingWithinDays !== null ? 1 : 0)
-
+  const activeFilters = stores.length + genres.length + (endingWithinDays !== null ? 1 : 0)
   const anyFilter = activeFilters > 0
 
   const copyLink = async (url: string) => {
@@ -356,15 +309,8 @@ function App() {
   if (load.state === 'loading') {
     return (
       <div className="splash" role="status">
-        <h1>
-          Game<span style={{ color: '#4ade80' }}>Grab</span>
-        </h1>
-
-        <p>
-          {slowStart
-            ? 'Waking up the server. This can take up to a minute…'
-            : 'Fetching the latest deals…'}
-        </p>
+        <h1>Game<span style={{ color: '#4ade80' }}>Grab</span></h1>
+        <p>{slowStart ? 'Waking up the server. This can take up to a minute…' : 'Fetching the latest deals…'}</p>
       </div>
     )
   }
@@ -373,9 +319,7 @@ function App() {
     return (
       <div className="status">
         <h1>GameGrab</h1>
-        <p className="error">
-          Can't reach the backend: {load.message}
-        </p>
+        <p className="error">Can't reach the backend: {load.message}</p>
         <p>Check that the server is running on {API_URL}</p>
       </div>
     )
@@ -385,12 +329,9 @@ function App() {
     <>
       <header>
         <div>
-          <h1>
-            Game<span style={{ color: '#4ade80' }}>Grab</span>
-          </h1>
+          <h1>Game<span style={{ color: '#4ade80' }}>Grab</span></h1>
           <p>Free and discounted PC games, all in one place.</p>
         </div>
-
         <Account />
       </header>
 
@@ -398,26 +339,17 @@ function App() {
         <main>
           <div className="search-bar">
             <span className="search-icon">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-              >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                 <circle cx="10.5" cy="10.5" r="7.5" />
                 <line x1="16" y1="16" x2="22.5" y2="22.5" />
               </svg>
             </span>
-
             <input
               type="search"
               placeholder="Search for games..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-
             <button
               className="search-action"
               type="button"
@@ -425,125 +357,95 @@ function App() {
             >
               ☰
             </button>
+          </div>
 
-            {filterMenuOpen && (
-              <div className="filter-overlay">
-                <div className="filter-menu">
-                  <div className="filter-menu-header">
+          {filterMenuOpen && (
+            <div className="filter-overlay">
+              <div className="filter-menu">
+                <div className="filter-menu-header">
+                  <button
+                    type="button"
+                    className="filter-close"
+                    onClick={() => setFilterMenuOpen(false)}
+                    aria-label="Close filters"
+                  >
+                    ×
+                  </button>
+                  <h1>GameGrab</h1>
+                </div>
+
+                <div className="filter-menu-content">
+                  <div className="filter-menu-section">
+                    <h2>Store</h2>
+                    {STORES.map((store) => (
+                      <label key={store} className="filter-menu-option">
+                        <span>{store}</span>
+                        <input
+                          type="checkbox"
+                          checked={stores.includes(store)}
+                          onChange={() => setStores((current) => toggle(current, store))}
+                        />
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="filter-menu-section">
+                    <h2>Genre</h2>
+                    {FILTER_GENRES.map((genre) => (
+                      <label key={genre} className="filter-menu-option">
+                        <span>{genre}</span>
+                        <input
+                          type="checkbox"
+                          checked={genres.includes(genre)}
+                          onChange={() => setGenres((current) => toggle(current, genre))}
+                        />
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="filter-menu-section">
+                    <h2>Ends in</h2>
+                    {[1, 7].map((days) => (
+                      <label key={days} className="filter-menu-option">
+                        <span>{days} {days === 1 ? 'day' : 'days'}</span>
+                        <input
+                          type="checkbox"
+                          checked={endingWithinDays === days}
+                          onChange={() =>
+                            setEndingWithinDays(endingWithinDays === days ? null : days)
+                          }
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="filter-menu-actions">
+                  <button
+                    type="button"
+                    className="filter-clear"
+                    onClick={() => {
+                      setStores([])
+                      setGenres([])
+                      setEndingWithinDays(null)
+                    }}
+                  >
+                    Clear all
+                  </button>
+
+                  <div className="filter-menu-actions-right">
                     <button
                       type="button"
-                      className="filter-close"
+                      className="filter-results"
                       onClick={() => setFilterMenuOpen(false)}
-                      aria-label="Close filters"
                     >
-                      ×
+                      Show results
                     </button>
-
-                    <h1>GameGrab</h1>
-                  </div>
-
-                  <div className="filter-menu-content">
-                    <div className="filter-menu-section">
-                      <h2>Store</h2>
-
-                      {STORES.map((store) => (
-                        <label
-                          key={store}
-                          className="filter-menu-option"
-                        >
-                          <span>{store}</span>
-
-                          <input
-                            type="checkbox"
-                            checked={stores.includes(store)}
-                            onChange={() =>
-                              setStores((current) =>
-                                toggle(current, store),
-                              )
-                            }
-                          />
-                        </label>
-                      ))}
-                    </div>
-
-                    <div className="filter-menu-section">
-                      <h2>Genre</h2>
-
-                      {allGenres.map((genre) => (
-                        <label
-                          key={genre}
-                          className="filter-menu-option"
-                        >
-                          <span>{genre}</span>
-
-                          <input
-                            type="checkbox"
-                            checked={genres.includes(genre)}
-                            onChange={() =>
-                              setGenres((current) =>
-                                toggle(current, genre),
-                              )
-                            }
-                          />
-                        </label>
-                      ))}
-                    </div>
-
-                    <div className="filter-menu-section">
-                      <h2>Ends in</h2>
-
-                      {[1, 7].map((days) => (
-                        <label
-                          key={days}
-                          className="filter-menu-option"
-                        >
-                          <span>
-                            {days} {days === 1 ? 'day' : 'days'}
-                          </span>
-
-                          <input
-                            type="checkbox"
-                            checked={endingWithinDays === days}
-                            onChange={() =>
-                              setEndingWithinDays(
-                                endingWithinDays === days
-                                  ? null
-                                  : days,
-                              )
-                            }
-                          />
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="filter-menu-actions">
-                    <button
-                      type="button"
-                      className="filter-clear"
-                      onClick={() => {
-                        setStores([])
-                        setGenres([])
-                        setEndingWithinDays(null)
-                      }}
-                    >
-                      Clear all
-                    </button>
-
-                    <div className="filter-menu-actions-right">
-                      <button
-                        type="button"
-                        className="filter-results"
-                        onClick={() => setFilterMenuOpen(false)}
-                      >
-                        Show results
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           <section className="free-to-play-preview">
             <div className="free-to-play-preview-content">
@@ -565,9 +467,7 @@ function App() {
                 }
               >
                 <span>Explore Free-to-Play</span>
-                <span className="free-to-play-arrow" aria-hidden="true">
-                  ↓
-                </span>
+                <span className="free-to-play-arrow" aria-hidden="true">↓</span>
               </button>
             </div>
           </section>
@@ -601,8 +501,7 @@ function App() {
 
             {discountedOffers.length > 0 ? (
               <p className="count">
-                <strong>{discountedOffers.length}</strong>{' '}
-                discounted games
+                <strong>{discountedOffers.length}</strong> discounted games
               </p>
             ) : (
               <p className="count">
@@ -630,30 +529,20 @@ function App() {
                 type="button"
                 onClick={() => {
                   setCurrentPage((p) => Math.max(1, p - 1))
-                  window.scrollTo({
-                    top: 0,
-                    behavior: 'smooth',
-                  })
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
                 }}
                 disabled={safePage === 1}
               >
                 ← Previous
               </button>
-
               <span className="page-indicator">
                 {safePage} / {totalPages}
               </span>
-
               <button
                 type="button"
                 onClick={() => {
-                  setCurrentPage((p) =>
-                    Math.min(totalPages, p + 1),
-                  )
-                  window.scrollTo({
-                    top: 0,
-                    behavior: 'smooth',
-                  })
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
                 }}
                 disabled={safePage === totalPages}
               >
@@ -665,17 +554,13 @@ function App() {
           {freeLoad.state !== 'loading' && (
             <section className="always-free" id="always-free">
               <h2>Popular free games</h2>
-
               {freeLoad.state === 'error' ? (
-                <p className="error">
-                  Couldn't fetch the list of free games.
-                </p>
+                <p className="error">Couldn't fetch the list of free games.</p>
               ) : (
                 <>
                   {visibleFree.length > 0 ? (
                     <p className="count">
-                      <strong>{visibleFree.length}</strong>{' '}
-                      free to play games
+                      <strong>{visibleFree.length}</strong> free to play games
                     </p>
                   ) : (
                     <p className="count">
@@ -692,22 +577,12 @@ function App() {
                           href={game.claim_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={(event) =>
-                            openInApp(
-                              event,
-                              'Steam',
-                              game.steam_app_id,
-                              game.claim_url,
-                            )
-                          }
+                          onClick={(event) => openInApp(event, 'Steam', game.steam_app_id, game.claim_url)}
                         >
                           {game.title}
                         </a>
-
                         {game.genres.length > 0 && (
-                          <span className="genres">
-                            {game.genres.slice(0, 3).join(' · ')}
-                          </span>
+                          <span className="genres">{game.genres.slice(0, 3).join(' · ')}</span>
                         )}
                       </li>
                     ))}
@@ -721,359 +596,140 @@ function App() {
 
       <button
         type="button"
-        className={
-          atTop
-            ? 'to-top-button at-top'
-            : 'to-top-button'
-        }
-        onClick={() =>
-          window.scrollTo({
-            top: 0,
-            behavior: 'smooth',
-          })
-        }
+        className={atTop ? 'to-top-button at-top' : 'to-top-button'}
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         aria-label="Back to top"
       >
         ↑ Top
       </button>
 
       {selectedOffer && (
-        <div
-          className="modal-overlay"
-          onClick={() => setSelectedOffer(null)}
-        >
-          <div
-            className="modal"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: '580px',
-              overflow: 'visible',
-            }}
-          >
-            <button
-              className="modal-close"
-              onClick={() => setSelectedOffer(null)}
-              aria-label="Close"
-            >
+        <div className="modal-overlay" onClick={() => setSelectedOffer(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', overflow: 'visible' }}>
+            <button className="modal-close" onClick={() => setSelectedOffer(null)} aria-label="Close">
               ×
             </button>
-
             {selectedOffer.thumb && (
-              <img
-                className="modal-image"
-                src={selectedOffer.thumb}
-                alt={selectedOffer.title}
-                style={{ height: '110px' }}
-              />
+              <img className="modal-image" src={selectedOffer.thumb} alt={selectedOffer.title} style={{ height: '110px' }} />
             )}
-
-            <div
-              className="modal-content"
-              style={{ padding: '12px 14px' }}
-            >
-              <span
-                className="store"
-                style={{ fontSize: '11px' }}
-              >
-                {selectedOffer.store}
-              </span>
-
-              <h2
-                style={{
-                  fontSize: '17px',
-                  margin: '2px 0 6px',
-                }}
-              >
-                {selectedOffer.title}
-              </h2>
+            <div className="modal-content" style={{ padding: '12px 14px' }}>
+              <span className="store" style={{ fontSize: '11px' }}>{selectedOffer.store}</span>
+              <h2 style={{ fontSize: '17px', margin: '2px 0 6px' }}>{selectedOffer.title}</h2>
 
               {selectedOffer.genres.length > 0 && (
-                <p
-                  style={{
-                    margin: '4px 0',
-                    fontSize: '12px',
-                  }}
-                >
-                  <strong style={{ color: 'var(--text)' }}>
-                    Genres
-                  </strong>{' '}
-                  <span style={{ color: 'var(--text-dim)' }}>
-                    {selectedOffer.genres.join(' · ')}
-                  </span>
+                <p style={{ margin: '4px 0', fontSize: '12px' }}>
+                  <strong style={{ color: 'var(--text)' }}>Genres</strong>{' '}
+                  <span style={{ color: 'var(--text-dim)' }}>{selectedOffer.genres.join(' · ')}</span>
                 </p>
               )}
 
               {details === 'loading' && (
-                <p
-                  className="description"
-                  style={{
-                    fontSize: '12px',
-                    margin: '8px 0 6px',
-                  }}
-                >
-                  Loading description…
-                </p>
+                <p className="description" style={{ fontSize: '12px', margin: '8px 0 6px' }}>Loading description…</p>
               )}
-
               {details === 'error' && (
-                <p
-                  className="description"
-                  style={{
-                    fontSize: '12px',
-                    margin: '8px 0 6px',
-                  }}
-                >
-                  Couldn't load the description.
-                </p>
+                <p className="description" style={{ fontSize: '12px', margin: '8px 0 6px' }}>Couldn't load the description.</p>
               )}
-
-              {typeof details === 'object' &&
-                details.description && (
-                  <>
-                    <p
-                      style={{
-                        margin: '8px 0 2px',
-                        fontWeight: 600,
-                        color: 'var(--text)',
-                        fontSize: '12px',
-                      }}
-                    >
-                      Description
-                    </p>
-
-                    <p
-                      className="description"
-                      style={{
-                        fontSize: '12px',
-                        margin: '0 0 6px',
-                        lineHeight: 1.35,
-                      }}
-                    >
-                      {details.description}
-                    </p>
-                  </>
-                )}
+              {typeof details === 'object' && details.description && (
+                <>
+                  <p style={{ margin: '8px 0 2px', fontWeight: 600, color: 'var(--text)', fontSize: '12px' }}>Description</p>
+                  <p className="description" style={{ fontSize: '12px', margin: '0 0 6px', lineHeight: 1.35 }}>{details.description}</p>
+                </>
+              )}
 
               {selectedOffer.review_positive_percent !== null &&
                 selectedOffer.review_total !== null &&
                 selectedOffer.review_total > 0 &&
                 selectedOffer.review_source && (
-                  <p
-                    style={{
-                      color: 'var(--text-dim)',
-                      fontWeight: 600,
-                      fontSize: '12px',
-                      margin: '6px 0',
-                    }}
-                  >
-                    {Math.round(
-                      selectedOffer.review_positive_percent,
-                    )}
-                    % positive
+                  <p style={{ color: 'var(--text-dim)', fontWeight: 600, fontSize: '12px', margin: '6px 0' }}>
+                    {Math.round(selectedOffer.review_positive_percent)}% positive
                     {' · '}
-                    {selectedOffer.review_total.toLocaleString(
-                      'en-US',
-                    )}{' '}
-                    reviews on {selectedOffer.review_source}
+                    {selectedOffer.review_total.toLocaleString('en-US')} reviews on {selectedOffer.review_source}
                   </p>
                 )}
 
-              {typeof details === 'object' &&
-                (details.minimum_requirements ||
-                  details.recommended_requirements) && (
-                  <div style={{ marginTop: '8px' }}>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setRequirementsOpen((v) => !v)
-                      }
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--text)',
-                        fontWeight: 600,
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        width: '100%',
-                        padding: '4px 0',
-                      }}
-                    >
-                      <span>System requirements</span>
-                      <span>
-                        {requirementsOpen ? '−' : '+'}
-                      </span>
-                    </button>
-
-                    {requirementsOpen && (
-                      <div
-                        className="requirements-content"
-                        style={{
-                          marginTop: '4px',
-                          fontSize: '11px',
-                          maxHeight: '50px',
-                          overflowY: 'auto',
-                        }}
-                      >
-                        {details.minimum_requirements && (
-                          <div>
-                            <h4>Minimum</h4>
-                            <p>
-                              {withoutRequirementLabel(
-                                details.minimum_requirements,
-                              )}
-                            </p>
-                          </div>
-                        )}
-
-                        {details.recommended_requirements && (
-                          <div>
-                            <h4>Recommended</h4>
-                            <p>
-                              {withoutRequirementLabel(
-                                details.recommended_requirements,
-                              )}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '8px',
-                  marginTop: '12px',
-                }}
-              >
-                <div
-                  style={{
-                    flex: 1,
-                    background: 'var(--bg)',
-                    border: '1px solid var(--line)',
-                    borderRadius: '6px',
-                    padding: '8px',
-                    textAlign: 'center',
-                  }}
-                >
-                  <div
+              {typeof details === 'object' && (details.minimum_requirements || details.recommended_requirements) && (
+                <div style={{ marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setRequirementsOpen((v) => !v)}
                     style={{
-                      fontSize: '10px',
-                      color: 'var(--text-dim)',
-                      marginBottom: '2px',
-                    }}
-                  >
-                    Price
-                  </div>
-
-                  <p
-                    className="price"
-                    style={{
-                      margin: 0,
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text)',
+                      fontWeight: 600,
                       fontSize: '12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                      padding: '4px 0',
                     }}
                   >
+                    <span>System requirements</span>
+                    <span>{requirementsOpen ? '−' : '+'}</span>
+                  </button>
+                  {requirementsOpen && (
+                    <div className="requirements-content" style={{ marginTop: '4px', fontSize: '11px', maxHeight: '50px', overflowY: 'auto' }}>
+                      {details.minimum_requirements && (
+                        <div>
+                          <h4>Minimum</h4>
+                          <p>{withoutRequirementLabel(details.minimum_requirements)}</p>
+                        </div>
+                      )}
+                      {details.recommended_requirements && (
+                        <div>
+                          <h4>Recommended</h4>
+                          <p>{withoutRequirementLabel(details.recommended_requirements)}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                <div style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '6px', padding: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '2px' }}>Price</div>
+                  <p className="price" style={{ margin: 0, fontSize: '12px' }}>
                     {selectedOffer.is_free ? (
                       <>
-                        <s>
-                          ${selectedOffer.normal_price.toFixed(2)}
-                        </s>{' '}
-                        <strong style={{ color: 'var(--ok)' }}>
-                          Free right now
-                        </strong>
+                        <s>${selectedOffer.normal_price.toFixed(2)}</s>{' '}
+                        <strong style={{ color: 'var(--ok)' }}>Free right now</strong>
                       </>
                     ) : (
                       <>
-                        <s>
-                          ${selectedOffer.normal_price.toFixed(2)}
-                        </s>{' '}
-                        <span style={{ color: 'var(--ok)' }}>
-                          ${selectedOffer.sale_price.toFixed(2)}
-                        </span>
+                        <s>${selectedOffer.normal_price.toFixed(2)}</s>{' '}
+                        <span style={{ color: 'var(--ok)' }}>${selectedOffer.sale_price.toFixed(2)}</span>
                       </>
                     )}{' '}
-                    <span className="savings">
-                      −{Math.round(selectedOffer.savings)}%
-                    </span>
+                    <span className="savings">−{Math.round(selectedOffer.savings)}%</span>
                   </p>
                 </div>
-
-                <div
-                  style={{
-                    flex: 1,
-                    background: 'var(--bg)',
-                    border: '1px solid var(--line)',
-                    borderRadius: '6px',
-                    padding: '8px',
-                    textAlign: 'center',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: '10px',
-                      color: 'var(--text-dim)',
-                      marginBottom: '2px',
-                    }}
-                  >
-                    Time Left
-                  </div>
-
-                  <div
-                    style={{
-                      fontWeight: 600,
-                      fontSize: '12px',
-                    }}
-                  >
-                    {timeLeft(selectedOffer.ends_at) || '—'}
-                  </div>
+                <div style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '6px', padding: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '2px' }}>Time Left</div>
+                  <div style={{ fontWeight: 600, fontSize: '12px' }}>{timeLeft(selectedOffer.ends_at) || '—'}</div>
                 </div>
               </div>
 
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                  marginTop: '10px',
-                }}
-              >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
                 <a
                   href={selectedOffer.claim_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(event) =>
-                    openInApp(
-                      event,
-                      selectedOffer.store,
-                      selectedOffer.steam_app_id,
-                      selectedOffer.claim_url,
-                    )
+                    openInApp(event, selectedOffer.store, selectedOffer.steam_app_id, selectedOffer.claim_url)
                   }
                   className="primary-button"
-                  style={{
-                    textAlign: 'center',
-                    padding: '7px 10px',
-                    fontSize: '13px',
-                  }}
+                  style={{ textAlign: 'center', padding: '7px 10px', fontSize: '13px' }}
                 >
                   Get it on {selectedOffer.store} →
                 </a>
-
                 <button
                   type="button"
                   className="share-button"
-                  onClick={() =>
-                    copyLink(selectedOffer.claim_url)
-                  }
-                  style={{
-                    width: '100%',
-                    padding: '7px 10px',
-                    fontSize: '13px',
-                  }}
+                  onClick={() => copyLink(selectedOffer.claim_url)}
+                  style={{ width: '100%', padding: '7px 10px', fontSize: '13px' }}
                 >
                   {copied ? 'Copied!' : 'Copy link'}
                 </button>
