@@ -106,11 +106,13 @@ Create the file `.env` in `backend/` and use `.env.example` as a template:
 DATABASE_URL=
 MIN_SAVINGS_PERCENT=80
 MAX_PER_SERIES=3
+CACHE_SECONDS=300
 ```
 
 - `DATABASE_URL` (required): the database connection string from Supabase.
 - `MIN_SAVINGS_PERCENT` (optional, default 80): minimum discount for an offer to be shown.
 - `MAX_PER_SERIES` (optional, default 3): max number of near-identical titles (same series) shown. 0 turns the cap off.
+- `CACHE_SECONDS` (optional, default 300): how long `/offers` and `/free-games` keep their answer in memory before asking the database again. 0 turns the cache off.
 
 `.env` contains sensitive information and must not be pushed to GitHub.
 Never put real values in `.env.example`, since that file is pushed.
@@ -163,16 +165,18 @@ http://localhost:5173
 
 The frontend communicates with the FastAPI backend through API requests.
 
-The backend has three endpoints:
+The backend has four endpoints:
 
 | Endpoint | Description |
 | --- | --- |
 | `GET /health` | Checks that the server works and can reach the database |
-| `GET /offers` | Current free games and big discounts |
+| `GET /offers` | Current free games and big discounts, with what the cards need |
+| `GET /offers/{id}` | Description and system requirements for one offer, fetched when its details window opens |
 | `GET /free-games` | Popular games that are always free |
 
 All of them answer with status 503 and `"database": "disconnected"` if the
 database can't be reached, so the frontend never mistakes an outage for "no offers".
+Answers are gzip-compressed.
 
 `/health` is used to check that the FastAPI server works and that it can connect to the PostgreSQL database.
 

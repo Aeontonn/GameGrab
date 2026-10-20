@@ -23,12 +23,9 @@ export type Offer = {
   // The game's genres according to Steam, in English. Empty list if Steam doesn't know the game.
   genres: string[]
 
-  // A short description of the game. Missing when no description was found.
-  description: string | null
-
-  // PC system requirements from Steam. May be missing for some games.
-  minimum_requirements: string | null
-  recommended_requirements: string | null
+  // The first sentence of the description, shown on the card. The full text
+  // comes from /offers/{id}. null when no description was found.
+  short_description: string | null
 
   // Extra launcher or account the game needs besides the store's own, e.g.
   // "Ubisoft Connect launcher". null when there is none.
@@ -43,9 +40,17 @@ export type Offer = {
 
   // When the offer expires, as an ISO time. null when the store doesn't say.
   ends_at: string | null
+}
 
-  // When the row was last fetched from CheapShark.
-  fetched_at: string
+// The longer texts for one offer, exactly as /offers/{id} returns them. Kept
+// out of /offers so the list loads fast, and fetched when a game is opened.
+export type OfferDetails = {
+  // A short description of the game. Missing when no description was found.
+  description: string | null
+
+  // PC system requirements from Steam. May be missing for some games.
+  minimum_requirements: string | null
+  recommended_requirements: string | null
 }
 
 // A game that is always free (free to play), exactly as /free-games returns it.
