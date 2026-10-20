@@ -23,6 +23,18 @@ const withoutRequirementLabel = (value: string): string =>
 
 const ITEMS_PER_PAGE = 40
 
+const FILTER_GENRES = [
+  'Action',
+  'Adventure',
+  'Casual',
+  'Indie',
+  'RPG',
+  'Simulation',
+  'Sports',
+  'Strategy',
+  'Racing',
+]
+
 // How long the mouse has to rest on a card before its details are fetched.
 // Short enough to finish before most clicks, long enough that just moving the
 // mouse across the grid doesn't fetch every card it passes.
@@ -77,7 +89,10 @@ function OfferCard({
         <p className="description">{offer.short_description}</p>
       )}
       {hasReviews && (
-        <p className="game-reviews" style={{ color: 'var(--text-dim)', fontWeight: 600, margin: '4px 0 8px' }}>
+        <p
+          className="game-reviews"
+          style={{ color: 'var(--text-dim)', fontWeight: 600, margin: '4px 0 8px' }}
+        >
           {Math.round(offer.review_positive_percent!)}% positive
           {' · '}
           {offer.review_total!.toLocaleString('en-US')} reviews on {offer.review_source}
@@ -118,10 +133,9 @@ function App() {
   const [openedAt] = useState(() => Date.now())
   const [stores, setStores] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [showTimeFilter, setShowTimeFilter] = useState(false)
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false)
   const [genres, setGenres] = useState<string[]>([])
   const [endingWithinDays, setEndingWithinDays] = useState<number | null>(null)
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const [atTop, setAtTop] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null)
@@ -234,15 +248,6 @@ function App() {
     [freeLoad],
   )
 
-  const allGenres = useMemo(() => {
-    const offers = load.state === 'ok' ? load.offers : []
-    const found = new Set([
-      ...offers.flatMap((offer) => offer.genres),
-      ...freeGames.flatMap((game) => game.genres),
-    ])
-    return [...found].sort((a, b) => a.localeCompare(b, 'en'))
-  }, [load, freeGames])
-
   const matchesSearch = useCallback(
     (title: string) => title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
     [searchTerm],
@@ -331,57 +336,6 @@ function App() {
       </header>
 
       <div className="layout">
-        <aside>
-          <button
-            type="button"
-            className="filter-toggle"
-            onClick={() => setFiltersOpen((current) => !current)}
-            aria-expanded={filtersOpen}
-            aria-controls="filter-panel"
-          >
-            <span>Filter{anyFilter && ` (${activeFilters})`}</span>
-            <span aria-hidden="true">{filtersOpen ? '−' : '+'}</span>
-          </button>
-
-          <div id="filter-panel" className={filtersOpen ? 'filter-panel open' : 'filter-panel'}>
-            <h2>Store</h2>
-            {STORES.map((store) => (
-              <label key={store} className="filter-option">
-                <input
-                  type="checkbox"
-                  checked={stores.includes(store)}
-                  onChange={() => setStores((current) => toggle(current, store))}
-                />
-                {store}
-              </label>
-            ))}
-
-            <h2>Genre</h2>
-            {allGenres.map((genre) => (
-              <label key={genre} className="filter-option">
-                <input
-                  type="checkbox"
-                  checked={genres.includes(genre)}
-                  onChange={() => setGenres((current) => toggle(current, genre))}
-                />
-                {genre}
-              </label>
-            ))}
-
-            <button
-              type="button"
-              onClick={() => {
-                setStores([])
-                setGenres([])
-                setEndingWithinDays(null)
-              }}
-              disabled={!anyFilter}
-            >
-              Show all
-            </button>
-          </div>
-        </aside>
-
         <main>
           <div className="search-bar">
             <span className="search-icon">
@@ -399,28 +353,99 @@ function App() {
             <button
               className="search-action"
               type="button"
-              onClick={() => setShowTimeFilter(!showTimeFilter)}
+              onClick={() => setFilterMenuOpen(true)}
             >
               ☰
             </button>
-            {showTimeFilter && (
-              <div className="time-filter">
-                {[1, 7].map((days) => (
-                  <label key={days} className="filter-option">
-                    <input
-                      type="checkbox"
-                      name="time-left"
-                      checked={endingWithinDays === days}
-                      onChange={() =>
-                        setEndingWithinDays(endingWithinDays === days ? null : days)
-                      }
-                    />
-                    Ends in {days} {days === 1 ? 'day' : 'days'}
-                  </label>
-                ))}
-              </div>
-            )}
           </div>
+
+          {filterMenuOpen && (
+            <div className="filter-overlay">
+              <div className="filter-menu">
+                <div className="filter-menu-header">
+                  <button
+                    type="button"
+                    className="filter-close"
+                    onClick={() => setFilterMenuOpen(false)}
+                    aria-label="Close filters"
+                  >
+                    ×
+                  </button>
+                  <h1>GameGrab</h1>
+                </div>
+
+                <div className="filter-menu-content">
+                  <div className="filter-menu-section">
+                    <h2>Store</h2>
+                    {STORES.map((store) => (
+                      <label key={store} className="filter-menu-option">
+                        <span>{store}</span>
+                        <input
+                          type="checkbox"
+                          checked={stores.includes(store)}
+                          onChange={() => setStores((current) => toggle(current, store))}
+                        />
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="filter-menu-section">
+                    <h2>Genre</h2>
+                    {FILTER_GENRES.map((genre) => (
+                      <label key={genre} className="filter-menu-option">
+                        <span>{genre}</span>
+                        <input
+                          type="checkbox"
+                          checked={genres.includes(genre)}
+                          onChange={() => setGenres((current) => toggle(current, genre))}
+                        />
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="filter-menu-section">
+                    <h2>Ends in</h2>
+                    {[1, 7].map((days) => (
+                      <label key={days} className="filter-menu-option">
+                        <span>{days} {days === 1 ? 'day' : 'days'}</span>
+                        <input
+                          type="checkbox"
+                          checked={endingWithinDays === days}
+                          onChange={() =>
+                            setEndingWithinDays(endingWithinDays === days ? null : days)
+                          }
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="filter-menu-actions">
+                  <button
+                    type="button"
+                    className="filter-clear"
+                    onClick={() => {
+                      setStores([])
+                      setGenres([])
+                      setEndingWithinDays(null)
+                    }}
+                  >
+                    Clear all
+                  </button>
+
+                  <div className="filter-menu-actions-right">
+                    <button
+                      type="button"
+                      className="filter-results"
+                      onClick={() => setFilterMenuOpen(false)}
+                    >
+                      Show results
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <section className="free-to-play-preview">
             <div className="free-to-play-preview-content">
