@@ -156,6 +156,14 @@ header p {
   align-items: start;
 }
 
+/* Sticky sidebar – stays visible when scrolling */
+aside {
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
 /* The button that expands the filters. Only used on mobile, see the bottom of the file. */
 .filter-toggle {
   display: none;
@@ -700,6 +708,13 @@ main > h2 {
     gap: 20px;
   }
 
+  /* Disable sticky on mobile */
+  aside {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
   aside .filter-toggle {
     display: flex;
     justify-content: space-between;
@@ -787,7 +802,6 @@ main > h2 {
 .game-reviews strong {
   color: inherit;
   font-weight: 600;
-
 }
 
 /* Separate limited-time free offers from discounted games */
@@ -859,5 +873,4 @@ main > h2 {
     flex-direction: column;
     align-items: flex-start;
   }
-
 }
