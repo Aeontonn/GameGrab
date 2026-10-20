@@ -698,7 +698,9 @@ def to_row(
         "steam_app_id": steam_app_id,
         "claim_url": claim_url,
         "genres": genres,
-        "description": description,
+        # Steam sends the description with HTML codes like &quot;. Decoded
+        # here rather than at lookup, so the cached rows get fixed too.
+        "description": unescape(description) if description else None,
         "minimum_requirements": minimum_requirements,
         "recommended_requirements": recommended_requirements,
         "launcher_notice": launcher_notice,

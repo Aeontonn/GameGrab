@@ -1,4 +1,4 @@
-import type { FreeGame, Offer } from './types'
+import type { FreeGame, Offer, OfferDetails } from './types'
 
 // The backend address. Set as an environment variable on deploy, otherwise the local server.
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -24,14 +24,29 @@ export async function fetchOffers(): Promise<Offer[]> {
   return offers.map((offer) => ({
     ...offer,
     genres: offer.genres ?? [],
-    description: offer.description ?? null,
-    minimum_requirements: offer.minimum_requirements ?? null,
-    recommended_requirements: offer.recommended_requirements ?? null,
+    short_description: offer.short_description ?? null,
     review_positive_percent: offer.review_positive_percent ?? null,
     review_total: offer.review_total ?? null,
     review_source: offer.review_source ?? null,
     ends_at: offer.ends_at ?? null,
   }))
+}
+
+// Fetches the description and system requirements for one offer, shown in
+// its details window.
+export async function fetchOfferDetails(id: number): Promise<OfferDetails> {
+  const response = await fetch(`${API_URL}/offers/${id}`)
+
+  if (!response.ok) {
+    throw new Error(`Backend responded ${response.status}`)
+  }
+
+  const details: OfferDetails = await response.json()
+  return {
+    description: details.description ?? null,
+    minimum_requirements: details.minimum_requirements ?? null,
+    recommended_requirements: details.recommended_requirements ?? null,
+  }
 }
 
 // Fetches the games that are always free. The backend already sorts them

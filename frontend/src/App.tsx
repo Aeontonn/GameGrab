@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Account from './Account'
-import { API_URL, fetchFreeGames, fetchOffers } from './api'
+import { API_URL, fetchFreeGames, fetchOfferDetails, fetchOffers } from './api'
 import { openInApp } from './appLink'
 import { STORES } from './types'
-import type { FreeGame, Offer } from './types'
+import type { FreeGame, Offer, OfferDetails } from './types'
 
 const toggle = (list: string[], value: string) =>
   list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
@@ -23,10 +23,41 @@ const withoutRequirementLabel = (value: string): string =>
 
 const ITEMS_PER_PAGE = 40
 
-function OfferCard({ offer, onClick }: { offer: Offer; onClick: () => void }) {
-  const shortDescription = offer.description
-    ? offer.description.split('.')[0].trim() + '.'
-    : null
+const FILTER_GENRES = [
+  'Action',
+  'Adventure',
+  'Casual',
+  'Indie',
+  'RPG',
+  'Simulation',
+  'Sports',
+  'Strategy',
+  'Racing',
+]
+
+// How long the mouse has to rest on a card before its details are fetched.
+// Short enough to finish before most clicks, long enough that just moving the
+// mouse across the grid doesn't fetch every card it passes.
+const PREFETCH_DELAY_MS = 120
+
+function OfferCard({
+  offer,
+  onClick,
+  onPrefetch,
+}: {
+  offer: Offer
+  onClick: () => void
+  onPrefetch: () => void
+}) {
+  const prefetchTimer = useRef<number | undefined>(undefined)
+
+  const startPrefetch = () => {
+    window.clearTimeout(prefetchTimer.current)
+    prefetchTimer.current = window.setTimeout(onPrefetch, PREFETCH_DELAY_MS)
+  }
+  const cancelPrefetch = () => window.clearTimeout(prefetchTimer.current)
+
+  useEffect(() => cancelPrefetch, [])
 
   const hasReviews =
     offer.review_positive_percent !== null &&
@@ -35,7 +66,14 @@ function OfferCard({ offer, onClick }: { offer: Offer; onClick: () => void }) {
     offer.review_source
 
   return (
-    <li onClick={onClick} style={{ cursor: 'pointer' }}>
+    <li
+      onClick={onClick}
+      // Fetches the details while the mouse rests on the card, so they're
+      // usually there before the window opens.
+      onMouseEnter={startPrefetch}
+      onMouseLeave={cancelPrefetch}
+      style={{ cursor: 'pointer' }}
+    >
       {offer.thumb && <img className="game-image" src={offer.thumb} alt={offer.title} />}
       <span className="store">{offer.store}</span>
       <h3>{offer.title}</h3>
@@ -47,11 +85,14 @@ function OfferCard({ offer, onClick }: { offer: Offer; onClick: () => void }) {
           {offer.genres.join(' · ')}
         </p>
       )}
-      {shortDescription && (
-        <p className="description">{shortDescription}</p>
+      {offer.short_description && (
+        <p className="description">{offer.short_description}</p>
       )}
       {hasReviews && (
-        <p className="game-reviews" style={{ color: 'var(--text-dim)', fontWeight: 600, margin: '4px 0 8px' }}>
+        <p
+          className="game-reviews"
+          style={{ color: 'var(--text-dim)', fontWeight: 600, margin: '4px 0 8px' }}
+        >
           {Math.round(offer.review_positive_percent!)}% positive
           {' · '}
           {offer.review_total!.toLocaleString('en-US')} reviews on {offer.review_source}
@@ -96,13 +137,18 @@ function App() {
   const [openedAt] = useState(() => Date.now())
   const [stores, setStores] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [showTimeFilter, setShowTimeFilter] = useState(false)
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false)
   const [genres, setGenres] = useState<string[]>([])
   const [endingWithinDays, setEndingWithinDays] = useState<number | null>(null)
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const [atTop, setAtTop] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null)
+  const [details, setDetails] = useState<OfferDetails | 'loading' | 'error'>('loading')
+  // Finished details by offer id, and requests still on their way, so hovering
+  // and then clicking the same card only asks the backend once.
+  const detailsCache = useRef(new Map<number, OfferDetails>())
+  const detailsRequests = useRef(new Map<number, Promise<OfferDetails>>())
+  const [slowStart, setSlowStart] = useState(false)
   const [requirementsOpen, setRequirementsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -111,6 +157,15 @@ function App() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  // The backend sleeps on Render's free plan when nobody has used it for a while,
+  // and waking it up takes up to a minute. If the offers haven't come after a few
+  // seconds, the loading screen says so, so it doesn't look like the page is broken.
+  useEffect(() => {
+    if (load.state !== 'loading') return
+    const timer = window.setTimeout(() => setSlowStart(true), 5000)
+    return () => window.clearTimeout(timer)
+  }, [load.state])
 
   useEffect(() => {
     fetchOffers()
@@ -123,6 +178,53 @@ function App() {
       .then((games) => setFreeLoad({ state: 'ok', games }))
       .catch(() => setFreeLoad({ state: 'error' }))
   }, [])
+
+  // Starts fetching an offer's details, unless they're already here or on their way.
+  const loadDetails = useCallback((id: number): Promise<OfferDetails> => {
+    const saved = detailsCache.current.get(id)
+    if (saved) return Promise.resolve(saved)
+
+    let request = detailsRequests.current.get(id)
+    if (!request) {
+      request = fetchOfferDetails(id)
+        .then((fetched) => {
+          detailsCache.current.set(id, fetched)
+          return fetched
+        })
+        .finally(() => detailsRequests.current.delete(id))
+      // A hover prefetch nobody waits for shouldn't show up as an uncaught error.
+      // The window handles the error itself if the game is opened.
+      request.catch(() => {})
+      detailsRequests.current.set(id, request)
+    }
+    return request
+  }, [])
+
+  // The full description and system requirements aren't part of /offers, so
+  // they're fetched when a game is hovered or opened. Saved, so opening the same
+  // game again is instant.
+  useEffect(() => {
+    if (!selectedOffer) return
+    const saved = detailsCache.current.get(selectedOffer.id)
+    if (saved) {
+      setDetails(saved)
+      return
+    }
+
+    setDetails('loading')
+    // Ignores the answer if another game was opened before it came.
+    let current = true
+    loadDetails(selectedOffer.id)
+      .then((fetched) => {
+        if (current) setDetails(fetched)
+      })
+      .catch(() => {
+        if (current) setDetails('error')
+      })
+    return () => {
+      current = false
+    }
+  }, [selectedOffer, loadDetails])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -150,15 +252,6 @@ function App() {
     [freeLoad],
   )
 
-  const allGenres = useMemo(() => {
-    const offers = load.state === 'ok' ? load.offers : []
-    const found = new Set([
-      ...offers.flatMap((offer) => offer.genres),
-      ...freeGames.flatMap((game) => game.genres),
-    ])
-    return [...found].sort((a, b) => a.localeCompare(b, 'en'))
-  }, [load, freeGames])
-
   const matchesSearch = useCallback(
     (title: string) => title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
     [searchTerm],
@@ -179,11 +272,9 @@ function App() {
     )
   }, [load, stores, genres, endingWithinDays, openedAt, matchesSearch])
 
-  // Separate temporarily free offers from discounted games.
   const freeOffers = visible.filter((offer) => offer.is_free)
   const discountedOffers = visible.filter((offer) => !offer.is_free)
 
-  // Pagination only applies to discounted games.
   const totalPages = Math.max(
     1,
     Math.ceil(discountedOffers.length / ITEMS_PER_PAGE),
@@ -191,7 +282,6 @@ function App() {
 
   const safePage = Math.min(currentPage, totalPages)
 
-  // Only show discounted games from the current page.
   const paginatedOffers = discountedOffers.slice(
     (safePage - 1) * ITEMS_PER_PAGE,
     safePage * ITEMS_PER_PAGE,
@@ -221,7 +311,12 @@ function App() {
   }
 
   if (load.state === 'loading') {
-    return <p className="status">Fetching offers…</p>
+    return (
+      <div className="splash" role="status">
+        <h1>Game<span style={{ color: '#4ade80' }}>Grab</span></h1>
+        <p>{slowStart ? 'Waking up the server. This can take up to a minute…' : 'Fetching the latest deals…'}</p>
+      </div>
+    )
   }
 
   if (load.state === 'error') {
@@ -238,66 +333,14 @@ function App() {
     <>
       <header>
         <div>
-          <h1>GameGrab</h1>
+          <h1>Game<span style={{ color: '#4ade80' }}>Grab</span></h1>
           <p>Free and discounted PC games, all in one place.</p>
         </div>
         <Account />
       </header>
 
       <div className="layout">
-        <aside>
-          <button
-            type="button"
-            className="filter-toggle"
-            onClick={() => setFiltersOpen((current) => !current)}
-            aria-expanded={filtersOpen}
-            aria-controls="filter-panel"
-          >
-            <span>Filter{anyFilter && ` (${activeFilters})`}</span>
-            <span aria-hidden="true">{filtersOpen ? '−' : '+'}</span>
-          </button>
-
-          <div id="filter-panel" className={filtersOpen ? 'filter-panel open' : 'filter-panel'}>
-            <h2>Store</h2>
-            {STORES.map((store) => (
-              <label key={store} className="filter-option">
-                <input
-                  type="checkbox"
-                  checked={stores.includes(store)}
-                  onChange={() => setStores((current) => toggle(current, store))}
-                />
-                {store}
-              </label>
-            ))}
-
-            <h2>Genre</h2>
-            {allGenres.map((genre) => (
-              <label key={genre} className="filter-option">
-                <input
-                  type="checkbox"
-                  checked={genres.includes(genre)}
-                  onChange={() => setGenres((current) => toggle(current, genre))}
-                />
-                {genre}
-              </label>
-            ))}
-
-            <button
-              type="button"
-              onClick={() => {
-                setStores([])
-                setGenres([])
-                setEndingWithinDays(null)
-              }}
-              disabled={!anyFilter}
-            >
-              Show all
-            </button>
-          </div>
-        </aside>
-
         <main>
-          <h2>Free and on sale</h2>
           <div className="search-bar">
             <span className="search-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -314,28 +357,99 @@ function App() {
             <button
               className="search-action"
               type="button"
-              onClick={() => setShowTimeFilter(!showTimeFilter)}
+              onClick={() => setFilterMenuOpen(true)}
             >
               ☰
             </button>
-            {showTimeFilter && (
-              <div className="time-filter">
-                {[1, 7].map((days) => (
-                  <label key={days} className="filter-option">
-                    <input
-                      type="checkbox"
-                      name="time-left"
-                      checked={endingWithinDays === days}
-                      onChange={() =>
-                        setEndingWithinDays(endingWithinDays === days ? null : days)
-                      }
-                    />
-                    Ends in {days} {days === 1 ? 'day' : 'days'}
-                  </label>
-                ))}
-              </div>
-            )}
           </div>
+
+          {filterMenuOpen && (
+            <div className="filter-overlay">
+              <div className="filter-menu">
+                <div className="filter-menu-header">
+                  <button
+                    type="button"
+                    className="filter-close"
+                    onClick={() => setFilterMenuOpen(false)}
+                    aria-label="Close filters"
+                  >
+                    ×
+                  </button>
+                  <h1>GameGrab</h1>
+                </div>
+
+                <div className="filter-menu-content">
+                  <div className="filter-menu-section">
+                    <h2>Store</h2>
+                    {STORES.map((store) => (
+                      <label key={store} className="filter-menu-option">
+                        <span>{store}</span>
+                        <input
+                          type="checkbox"
+                          checked={stores.includes(store)}
+                          onChange={() => setStores((current) => toggle(current, store))}
+                        />
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="filter-menu-section">
+                    <h2>Genre</h2>
+                    {FILTER_GENRES.map((genre) => (
+                      <label key={genre} className="filter-menu-option">
+                        <span>{genre}</span>
+                        <input
+                          type="checkbox"
+                          checked={genres.includes(genre)}
+                          onChange={() => setGenres((current) => toggle(current, genre))}
+                        />
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="filter-menu-section">
+                    <h2>Ends in</h2>
+                    {[1, 7].map((days) => (
+                      <label key={days} className="filter-menu-option">
+                        <span>{days} {days === 1 ? 'day' : 'days'}</span>
+                        <input
+                          type="checkbox"
+                          checked={endingWithinDays === days}
+                          onChange={() =>
+                            setEndingWithinDays(endingWithinDays === days ? null : days)
+                          }
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="filter-menu-actions">
+                  <button
+                    type="button"
+                    className="filter-clear"
+                    onClick={() => {
+                      setStores([])
+                      setGenres([])
+                      setEndingWithinDays(null)
+                    }}
+                  >
+                    Clear all
+                  </button>
+
+                  <div className="filter-menu-actions-right">
+                    <button
+                      type="button"
+                      className="filter-results"
+                      onClick={() => setFilterMenuOpen(false)}
+                    >
+                      Show results
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <section className="free-to-play-preview">
             <div className="free-to-play-preview-content">
@@ -362,7 +476,6 @@ function App() {
             </div>
           </section>
 
-          {/* Temporarily free offers */}
           <section className="limited-free">
             <h2>Free for a limited time</h2>
             <p>Games that are temporarily free to claim.</p>
@@ -371,9 +484,10 @@ function App() {
               <ul className="offers">
                 {freeOffers.map((offer) => (
                   <OfferCard
-                  key={offer.id}
-                  offer={offer}
-                  onClick={() => setSelectedOffer(offer)}
+                    key={offer.id}
+                    offer={offer}
+                    onClick={() => setSelectedOffer(offer)}
+                    onPrefetch={() => loadDetails(offer.id)}
                   />
                 ))}
               </ul>
@@ -386,28 +500,32 @@ function App() {
             )}
           </section>
 
-        {/* Discounted games */}
-        <section className="discounted-games">
-          <h2>Discounted games</h2>
+          <section className="discounted-games">
+            <h2>Discounted games</h2>
 
-          {discountedOffers.length > 0 ? (
-            <p className="count">
-              <strong>{discountedOffers.length}</strong> discounted games
-            </p>
-          ) : (
-            <p className="count">
-              {searchTerm.trim() || anyFilter
-                ? 'No discounted games match your search or filters.'
-                : 'No discounted games available right now.'}
-            </p>
-          )}
+            {discountedOffers.length > 0 ? (
+              <p className="count">
+                <strong>{discountedOffers.length}</strong> discounted games
+              </p>
+            ) : (
+              <p className="count">
+                {searchTerm.trim() || anyFilter
+                  ? 'No discounted games match your search or filters.'
+                  : 'No discounted games available right now.'}
+              </p>
+            )}
 
-          <ul className="offers">
-            {paginatedOffers.map((offer) => (
-              <OfferCard key={offer.id} offer={offer} onClick={() => setSelectedOffer(offer)} />
-            ))}
-          </ul>
-        </section>
+            <ul className="offers">
+              {paginatedOffers.map((offer) => (
+                <OfferCard
+                  key={offer.id}
+                  offer={offer}
+                  onClick={() => setSelectedOffer(offer)}
+                  onPrefetch={() => loadDetails(offer.id)}
+                />
+              ))}
+            </ul>
+          </section>
 
           {totalPages > 1 && (
             <div className="pagination">
@@ -444,7 +562,6 @@ function App() {
                 <p className="error">Couldn't fetch the list of free games.</p>
               ) : (
                 <>
-
                   {visibleFree.length > 0 ? (
                     <p className="count">
                       <strong>{visibleFree.length}</strong> free to play games
@@ -452,8 +569,8 @@ function App() {
                   ) : (
                     <p className="count">
                       {searchTerm.trim() || genres.length > 0
-                      ? 'No Free-to-Play games match your search or filters.'
-                      : 'No Free-to-Play games available right now.'}
+                        ? 'No Free-to-Play games match your search or filters.'
+                        : 'No Free-to-Play games available right now.'}
                     </p>
                   )}
 
@@ -510,10 +627,16 @@ function App() {
                 </p>
               )}
 
-              {selectedOffer.description && (
+              {details === 'loading' && (
+                <p className="description" style={{ fontSize: '12px', margin: '8px 0 6px' }}>Loading description…</p>
+              )}
+              {details === 'error' && (
+                <p className="description" style={{ fontSize: '12px', margin: '8px 0 6px' }}>Couldn't load the description.</p>
+              )}
+              {typeof details === 'object' && details.description && (
                 <>
                   <p style={{ margin: '8px 0 2px', fontWeight: 600, color: 'var(--text)', fontSize: '12px' }}>Description</p>
-                  <p className="description" style={{ fontSize: '12px', margin: '0 0 6px', lineHeight: 1.35 }}>{selectedOffer.description}</p>
+                  <p className="description" style={{ fontSize: '12px', margin: '0 0 6px', lineHeight: 1.35 }}>{details.description}</p>
                 </>
               )}
 
@@ -528,7 +651,7 @@ function App() {
                   </p>
                 )}
 
-              {(selectedOffer.minimum_requirements || selectedOffer.recommended_requirements) && (
+              {typeof details === 'object' && (details.minimum_requirements || details.recommended_requirements) && (
                 <div style={{ marginTop: '8px' }}>
                   <button
                     type="button"
@@ -552,16 +675,16 @@ function App() {
                   </button>
                   {requirementsOpen && (
                     <div className="requirements-content" style={{ marginTop: '4px', fontSize: '11px', maxHeight: '50px', overflowY: 'auto' }}>
-                      {selectedOffer.minimum_requirements && (
+                      {details.minimum_requirements && (
                         <div>
                           <h4>Minimum</h4>
-                          <p>{withoutRequirementLabel(selectedOffer.minimum_requirements)}</p>
+                          <p>{withoutRequirementLabel(details.minimum_requirements)}</p>
                         </div>
                       )}
-                      {selectedOffer.recommended_requirements && (
+                      {details.recommended_requirements && (
                         <div>
                           <h4>Recommended</h4>
-                          <p>{withoutRequirementLabel(selectedOffer.recommended_requirements)}</p>
+                          <p>{withoutRequirementLabel(details.recommended_requirements)}</p>
                         </div>
                       )}
                     </div>
