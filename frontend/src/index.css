@@ -2,23 +2,19 @@
    The layout is still bare-bones – only the palette is in place. */
 
 :root {
-  /* Backgrounds, lighter the closer they are to the viewer. */
-  --bg: #14151a; /* the page */
-  --surface: #1b1d25; /* the cards */
-  --line: #23252f; /* borders */
+  --bg: #14151a;
+  --surface: #1b1d25;
+  --line: #23252f;
   --line-strong: #2d2f38;
 
-  /* Shades of white, from headings down to the least important. */
-  --text: #edeef2; /* headings and titles */
-  --text-dim: #888e96; /* store, prices, filter options */
-  --text-faint: #585d63; /* footnotes and technical info */
+  --text: #edeef2;
+  --text-dim: #888e96;
+  --text-faint: #585d63;
 
-  /* Status colors. Not part of the palette, but they carry information. */
   --ok: #4ade80;
   --error: #f87171;
   --warn: #fbbf24;
 
-  /* Makes the browser draw checkboxes and other controls dark. */
   color-scheme: dark;
 }
 
@@ -34,7 +30,7 @@ h1 {
   margin: 0 0 4px;
 }
 
-/* Title on the left, the account on the right. */
+/* Header */
 header {
   display: flex;
   justify-content: space-between;
@@ -50,7 +46,7 @@ header p {
   color: var(--text-dim);
 }
 
-/* Login, or who is logged in. The form opens as a panel below the button. */
+/* Account */
 .account {
   position: relative;
   display: flex;
@@ -124,7 +120,6 @@ header p {
   color: var(--text-faint);
 }
 
-/* Log in / Create account: the selected one is at full strength. */
 .auth-tabs {
   display: flex;
   gap: 8px;
@@ -151,90 +146,16 @@ header p {
   cursor: default;
 }
 
-/* Filters on the left, list on the right. */
+/* Main layout */
 .layout {
   display: grid;
-  grid-template-columns: 180px 1fr;
+  grid-template-columns: 1fr;
   gap: 0;
   align-items: start;
 }
 
-/* Sticky sidebar – stays visible when scrolling */
-aside {
-  position: sticky;
-  top: 24px;
-  max-height: calc(100vh - 48px);
-  overflow-y: auto;
-  padding-right: 20px;
-  border-right: 1px solid rgba(255, 255, 255, 0.15);
-  font-size: 13px;
-}
-
 main {
-  padding-left: 24px;
-}
-
-/* The button that expands the filters. Only used on mobile, see the bottom of the file. */
-.filter-toggle {
-  display: none;
-}
-
-aside h2 {
-  font-size: 14px;
-  margin: 0 0 4px;
-}
-
-/* Line above Genre */
-aside h2:nth-of-type(2) {
-  margin-top: 16px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-/* Space between the filter groups, for example before "Genre". */
-.filter-option + h2 {
-  margin-top: 12px;
-}
-
-.filter-option {
-  display: flex;
-  align-items: center;
-  width: fit-content;
-  white-space: nowrap;
-  gap: 6px;
-  padding: 2px 0;
-  cursor: pointer;
-  color: var(--text-dim);
-  font-size: 13px;
-}
-
-/* The selected filter should stand out more than the unselected ones. */
-.filter-option:has(input:checked) {
-  color: var(--text);
-}
-
-aside button {
-  margin-top: 8px;
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  padding: 4px 10px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-aside button:disabled {
-  color: var(--text-faint);
-  cursor: default;
-}
-
-/* "Time left" sits on its own below "Show all", with space above. */
-.time-filter {
-  margin-top: 0;
-  position: absolute;
-  right: 12px;
-  top: calc(100% + 10px);
+  padding-left: 0;
 }
 
 .count {
@@ -246,6 +167,7 @@ aside button:disabled {
   color: var(--text);
 }
 
+/* Offer cards */
 .offers {
   list-style: none;
   margin: 0;
@@ -262,7 +184,6 @@ aside button:disabled {
   padding: 12px;
 }
 
-/* The image shown at the top of each game card. */
 .game-image {
   width: 100%;
   height: 140px;
@@ -285,7 +206,6 @@ aside button:disabled {
   color: var(--text-faint);
 }
 
-/* The genres on the card: supporting info, as muted as the price. */
 .genres {
   margin: 0 0 8px;
   font-size: 13px;
@@ -305,7 +225,7 @@ aside button:disabled {
   overflow: hidden;
 }
 
-/* Expandable system requirements on offer cards. */
+/* System requirements */
 .system-requirements {
   margin: 0 0 10px;
 }
@@ -313,16 +233,13 @@ aside button:disabled {
 .requirements-button {
   width: 100%;
   padding: 7px 9px;
-
   display: flex;
   align-items: center;
   justify-content: space-between;
-
   background: transparent;
   color: var(--text-dim);
   border: 1px solid var(--line-strong);
   border-radius: 6px;
-
   font: inherit;
   font-size: 12px;
   text-align: left;
@@ -337,14 +254,11 @@ aside button:disabled {
 .requirements-content {
   max-height: 240px;
   overflow-y: auto;
-
   margin-top: 8px;
   padding: 10px;
-
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 6px;
-
   font-size: 12px;
   line-height: 1.45;
   color: var(--text-dim);
@@ -369,12 +283,12 @@ aside button:disabled {
   margin-bottom: 0;
 }
 
+/* Prices */
 .price {
   margin: 0 0 8px;
   color: var(--text-dim);
 }
 
-/* The struck-through regular price should fade behind the sale price. */
 .price s {
   color: var(--text-faint);
 }
@@ -389,8 +303,6 @@ aside button:disabled {
   color: var(--ok);
 }
 
-/* How long the offer lasts. Full strength, since that's what makes
-   people click now instead of later. */
 .time-left {
   margin: 0 0 8px;
   font-size: 13px;
@@ -398,7 +310,6 @@ aside button:disabled {
   color: var(--text);
 }
 
-/* The link is the most important click on the page, so it gets full strength. */
 .offers a {
   color: var(--text);
   text-decoration: none;
@@ -409,14 +320,12 @@ aside button:disabled {
   border-bottom-color: var(--text);
 }
 
-/* Actions at the bottom of each offer card. */
 .offer-actions {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-/* Secondary action for copying the offer link. */
 .share-button {
   min-width: 72px;
   background: transparent;
@@ -434,13 +343,11 @@ aside button:disabled {
   border-color: var(--text-dim);
 }
 
+/* Loading / status */
 .status {
   padding: 24px;
 }
 
-/* Shown while the offers load. Centered on the screen with a slow pulse, so
-   it's clear something is happening during a long wait. The height leaves out
-   the body's padding, so the page doesn't scroll. */
 .splash {
   min-height: calc(100vh - 48px);
   min-height: calc(100dvh - 48px);
@@ -493,7 +400,7 @@ main > h2 {
   margin: 0 0 4px;
 }
 
-/* Smaller section below the offers: compact rows instead of cards. */
+/* Free games */
 .always-free {
   margin-top: 40px;
   padding-top: 24px;
@@ -546,6 +453,7 @@ main > h2 {
   color: var(--warn);
 }
 
+/* Navigation buttons */
 .jump-button,
 .to-top-button {
   background: var(--surface);
@@ -562,7 +470,6 @@ main > h2 {
   padding: 6px 12px;
 }
 
-/* Fixed to the viewport, so it stays on screen while scrolling. */
 .to-top-button {
   position: fixed;
   right: 24px;
@@ -577,6 +484,7 @@ main > h2 {
   border-color: var(--text-dim);
 }
 
+/* Search */
 .search-bar {
   display: flex;
   position: relative;
@@ -603,12 +511,9 @@ main > h2 {
 
 .search-bar input {
   width: 100%;
-
   border: none;
   outline: none;
-
   background: transparent;
-
   font-size: 1rem;
   color: #ffffff;
 }
@@ -621,10 +526,8 @@ main > h2 {
   border: 1px solid rgba(180, 200, 210, 0.35);
   background: rgba(93, 120, 138, 0.28);
   color: #eef3f4;
-
   padding: 8px 14px;
   border-radius: 6px;
-
   font-size: 0.9rem;
   cursor: pointer;
 }
@@ -742,118 +645,7 @@ main > h2 {
   opacity: 0.9;
 }
 
-/* Mobile. The sidebar would take half the screen and push the cards out to the
-   side, so everything goes in one column and the filters fold up behind a button. */
-@media (max-width: 700px) {
-  body {
-    padding: 16px 16px 88px; /* Room at the bottom so "Top" doesn't cover the last game. */
-  }
-
-  /* A long email shouldn't push the title together. */
-  .account-email {
-    max-width: 40vw;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .layout {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-
-  /* Disable sticky on mobile */
-  aside {
-    position: static;
-    max-height: none;
-    overflow: visible;
-    padding-right: 0;
-    border-right: none;
-    font-size: 14px;
-  }
-
-  main {
-    padding-left: 0;
-  }
-
-  aside .filter-toggle {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-    min-height: 44px;
-    margin: 0;
-    padding: 0 14px;
-    font: inherit;
-  }
-
-  .filter-panel {
-    display: none;
-  }
-
-  /* Two columns of options, so the list takes half the height. Headings,
-     "Show all" and "Time left" span the whole width. */
-  .filter-panel.open {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 16px;
-    margin-top: 12px;
-    padding: 16px;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-  }
-
-  .filter-panel > h2,
-  .filter-panel > button,
-  .time-filter {
-    grid-column: 1 / -1;
-  }
-
-  .filter-panel > button {
-    justify-self: start;
-  }
-
-  .time-filter {
-    margin-top: 20px;
-  }
-
-  /* Bigger rows, easier to hit with a finger. */
-  .filter-option {
-    padding: 8px 0;
-  }
-
-  .search-bar {
-    max-width: none;
-    margin: 12px 0 16px;
-    transform: none;
-    box-sizing: border-box;
-  }
-
-  /* At least 44px high, Apple's and Google's recommendation for touch. */
-  .account button,
-  aside button,
-  .jump-button,
-  .requirements-button,
-  .share-button {
-    min-height: 44px;
-  }
-
-  .offer-actions {
-    justify-content: space-between;
-  }
-
-  .to-top-button {
-    right: 16px;
-    bottom: 16px;
-  }
-
-  /* Nothing to go back to at the top, so it would only be in the way. */
-  .to-top-button.at-top {
-    display: none;
-  }
-}
-
+/* Reviews */
 .game-reviews {
   font-size: 0.85rem;
   color: #888;
@@ -865,7 +657,7 @@ main > h2 {
   font-weight: 600;
 }
 
-/* Separate limited-time free offers from discounted games */
+/* Limited free / discounted */
 .limited-free {
   margin-bottom: 3rem;
 }
@@ -879,7 +671,7 @@ main > h2 {
   margin-top: 1rem;
 }
 
-/* Free-to-Play preview on the homepage */
+/* Free-to-Play preview */
 .free-to-play-preview {
   background: #1b1d25;
   border: 1px solid #2b2e38;
@@ -927,6 +719,360 @@ main > h2 {
 
 .free-to-play-button:hover {
   background: #373d4a;
+}
+
+/* Fullscreen filter menu */
+.filter-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+
+  width: 100vw;
+  height: 100vh;
+
+  background: rgba(14, 15, 19, 0.97);
+  backdrop-filter: blur(18px);
+
+  overflow: hidden;
+}
+
+.filter-menu {
+  width: 100%;
+  height: 100vh;
+  box-sizing: border-box;
+
+  display: flex;
+  flex-direction: column;
+
+  padding: 24px 48px;
+
+  color: var(--text);
+}
+
+.filter-menu-header {
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  gap: 18px;
+
+  padding-bottom: 18px;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.filter-menu-header h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.filter-close {
+  width: 40px;
+  height: 40px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  background: transparent;
+  border: none;
+
+  color: var(--text);
+
+  font-family: inherit;
+  font-size: 34px;
+  font-weight: 300;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.filter-close:hover {
+  opacity: 0.7;
+}
+
+.filter-menu-content {
+  flex: 1;
+  min-height: 0;
+
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+
+  margin-top: 20px;
+}
+
+.filter-menu-section {
+  min-width: 0;
+  min-height: 0;
+
+  padding: 0 42px;
+
+  overflow-y: auto;
+}
+
+.filter-menu-section:first-child {
+  padding-left: 0;
+}
+
+.filter-menu-section:last-child {
+  padding-right: 0;
+}
+
+.filter-menu-section + .filter-menu-section {
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.filter-menu-section h2 {
+  margin: 0 0 14px;
+
+  font-size: 22px;
+  font-weight: 600;
+
+  color: var(--text);
+}
+
+.filter-menu-option {
+  min-height: 38px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  box-sizing: border-box;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+
+  color: var(--text);
+
+  font-size: 15px;
+  font-weight: 400;
+
+  cursor: pointer;
+}
+
+.filter-menu-option:first-of-type {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.filter-menu-option span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filter-menu-option input[type='checkbox'] {
+  width: 17px;
+  height: 17px;
+
+  flex-shrink: 0;
+
+  margin: 0;
+
+  cursor: pointer;
+}
+
+/* Bottom filter buttons */
+.filter-menu-actions {
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-top: 18px;
+  padding-top: 18px;
+
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.filter-menu-actions-right {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.filter-clear,
+.filter-results {
+  min-height: 42px;
+  padding: 9px 20px;
+
+  border-radius: 4px;
+
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.filter-clear {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: var(--text);
+}
+
+.filter-clear:hover {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.filter-results {
+  background: #edeef2;
+  border: 1px solid #edeef2;
+  color: #14151a;
+}
+
+.filter-results:hover {
+  opacity: 0.88;
+}
+
+/* Make filter overlay escape the search bar */
+.search-bar .filter-overlay {
+  position: fixed;
+  inset: 0;
+
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+
+  margin: 0;
+  padding: 0;
+
+  z-index: 9999;
+
+  background: rgba(14, 15, 19, 0.97);
+  backdrop-filter: blur(18px);
+
+  border: none;
+  border-radius: 0;
+
+  display: block;
+}
+
+.search-bar .filter-menu {
+  width: 100%;
+  height: 100vh;
+  min-height: 0;
+
+  box-sizing: border-box;
+
+  display: flex;
+  flex-direction: column;
+
+  padding: 24px 48px;
+}
+
+/* Mobile */
+@media (max-width: 700px) {
+  body {
+    padding: 16px 16px 88px;
+  }
+
+  .account-email {
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  main {
+    padding-left: 0;
+  }
+
+  .search-bar {
+    max-width: none;
+    margin: 12px 0 16px;
+    transform: none;
+    box-sizing: border-box;
+  }
+
+  .account button,
+  .jump-button,
+  .requirements-button,
+  .share-button {
+    min-height: 44px;
+  }
+
+  .offer-actions {
+    justify-content: space-between;
+  }
+
+  .to-top-button {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .to-top-button.at-top {
+    display: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .filter-overlay {
+    overflow-y: auto;
+  }
+
+  .filter-menu {
+    height: auto;
+    min-height: 100vh;
+
+    padding: 20px 24px;
+  }
+
+  .filter-menu-header {
+    padding-bottom: 16px;
+  }
+
+  .filter-menu-header h1 {
+    font-size: 26px;
+  }
+
+  .filter-menu-content {
+    display: grid;
+    grid-template-columns: 1fr;
+
+    margin-top: 16px;
+
+    overflow: visible;
+  }
+
+  .filter-menu-section,
+  .filter-menu-section:first-child,
+  .filter-menu-section:last-child {
+    padding: 20px 0;
+
+    overflow: visible;
+  }
+
+  .filter-menu-section + .filter-menu-section {
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .filter-menu-section h2 {
+    margin-bottom: 12px;
+  }
+
+  .filter-menu-actions {
+    margin-top: 16px;
+    padding-top: 16px;
+  }
+
+  .search-bar .filter-menu {
+    height: auto;
+    min-height: 100vh;
+    padding: 20px 24px;
+  }
 }
 
 @media (max-width: 600px) {
