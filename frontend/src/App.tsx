@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { KeyboardEvent, ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Account from './Account'
 import { API_URL, fetchFreeGames, fetchOffers } from './api'
 import { openInApp } from './appLink'
@@ -9,173 +8,71 @@ import type { FreeGame, Offer } from './types'
 const toggle = (list: string[], value: string) =>
   list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 
-// Exact time left, e.g. "2 d 4 h left". soon is true for the last 24 hours,
-// so the cards that really are about to end can stand out.
-const timeLeft = (endsAt: string | null, now: number): { text: string; soon: boolean } | null => {
+const timeLeft = (endsAt: string | null): string | null => {
   if (!endsAt) return null
-  const msLeft = new Date(endsAt).getTime() - now
-  if (msLeft <= 0) return { text: 'Ending now', soon: true }
+  const msLeft = new Date(endsAt).getTime() - Date.now()
+  if (msLeft <= 0) return 'Ending soon'
   const hours = Math.floor(msLeft / 3_600_000)
-  const minutes = Math.floor((msLeft % 3_600_000) / 60_000)
-  if (hours < 24) return { text: `${hours} h ${minutes} min left`, soon: true }
-  return { text: `${Math.floor(hours / 24)} d ${hours % 24} h left`, soon: false }
+  if (hours < 24) return hours <= 1 ? 'Less than 1 hour left' : `${hours} hours left`
+  const days = Math.floor(hours / 24)
+  return days === 1 ? '1 day left' : `${days} days left`
 }
 
 const withoutRequirementLabel = (value: string): string =>
   value.replace(/^(Minimum|Recommended):\s*/i, '')
 
-const money = (value: number) => `$${value.toFixed(2)}`
-
-// 143350 → "143k", so the review count fits on one line.
-const compact = (value: number) =>
-  value >= 1000 ? `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)}k` : String(value)
-
-const STORE_COLORS: Record<string, string> = {
-  Steam: 'var(--steam)',
-  GOG: 'var(--gog)',
-  'Epic Games': 'var(--epic)',
-}
-
-// The "Ends" filter. null means no limit.
-const TIME_OPTIONS: { label: string; days: number | null }[] = [
-  { label: 'Any time', days: null },
-  { label: 'Within 24 h', days: 1 },
-  { label: 'Within 7 days', days: 7 },
-]
-
 const ITEMS_PER_PAGE = 40
 
-// Steam's store header (460×215). CheapShark's thumb is only 231×87, which gets
-// blurry and cropped when it fills a card. Games without a Steam id keep the thumb.
-const imageFor = (offer: Offer): string | null =>
-  offer.steam_app_id
-    ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${offer.steam_app_id}/header.jpg`
-    : offer.thumb
+function OfferCard({ offer, onClick }: { offer: Offer; onClick: () => void }) {
+  const shortDescription = offer.description
+    ? offer.description.split('.')[0].trim() + '.'
+    : null
 
-const hasReviews = (offer: Offer) =>
-  offer.review_positive_percent !== null &&
-  offer.review_total !== null &&
-  offer.review_total > 0 &&
-  offer.review_source !== null
-
-// The game's image, shown whole whatever its shape. Epic's covers are portrait,
-// so a blurred copy of the same image fills the space around it instead of cropping.
-function GameImage({ offer, className, children }: { offer: Offer; className: string; children?: ReactNode }) {
-  const [src, setSrc] = useState(() => imageFor(offer))
+  const hasReviews =
+    offer.review_positive_percent !== null &&
+    offer.review_total !== null &&
+    offer.review_total > 0 &&
+    offer.review_source
 
   return (
-    <div className={className}>
-      {src && (
-        <>
-          <div className="media-blur" style={{ backgroundImage: `url("${src}")` }} />
-          <img
-            src={src}
-            alt=""
-            loading="lazy"
-            // Falls back to CheapShark's thumb if Steam has no header for the id.
-            onError={() => setSrc(src === offer.thumb ? null : offer.thumb)}
-          />
-        </>
+    <li onClick={onClick} style={{ cursor: 'pointer' }}>
+      {offer.thumb && <img className="game-image" src={offer.thumb} alt={offer.title} />}
+      <span className="store">{offer.store}</span>
+      <h3>{offer.title}</h3>
+      {offer.launcher_notice && (
+        <p className="launcher-warning">⚠ Also requires: {offer.launcher_notice}</p>
       )}
-      {children}
-    </div>
-  )
-}
-
-function StoreChip({ store }: { store: string }) {
-  return (
-    <span className="store-chip">
-      <span className="dot" style={{ background: STORE_COLORS[store] }} />
-      {store}
-    </span>
-  )
-}
-
-function Rating({ offer }: { offer: Offer }) {
-  const percent = Math.round(offer.review_positive_percent!)
-  const color = percent >= 80 ? 'var(--ok)' : percent >= 60 ? 'var(--warn)' : 'var(--error)'
-
-  return (
-    <p className="rating">
-      <span className="meter">
-        <i style={{ width: `${percent}%`, background: color }} />
-      </span>
-      {percent}% positive · {compact(offer.review_total!)} reviews
-    </p>
-  )
-}
-
-function TimeLeft({ endsAt, now }: { endsAt: string | null; now: number }) {
-  const left = timeLeft(endsAt, now)
-
-  return (
-    <span className={left?.soon ? 'timer soon' : 'timer'}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v5l3 2" />
-      </svg>
-      {left ? left.text : 'No end date'}
-    </span>
-  )
-}
-
-function OfferCard({ offer, now, onOpen }: { offer: Offer; now: number; onOpen: () => void }) {
-  // The whole card opens the details, also with the keyboard.
-  const onKeyDown = (event: KeyboardEvent<HTMLLIElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      onOpen()
-    }
-  }
-
-  return (
-    <li className="card" onClick={onOpen} onKeyDown={onKeyDown} tabIndex={0} aria-label={offer.title}>
-      <GameImage offer={offer} className="media">
-        <span className="badge">{offer.is_free ? 'FREE' : `−${Math.round(offer.savings)}%`}</span>
-        <StoreChip store={offer.store} />
-      </GameImage>
-
-      <div className="card-body">
-        <h3>{offer.title}</h3>
-        {offer.genres.length > 0 && <p className="genres">{offer.genres.slice(0, 3).join(' · ')}</p>}
-        {hasReviews(offer) && <Rating offer={offer} />}
-        {offer.launcher_notice && <p className="launcher-warning">Also requires {offer.launcher_notice}</p>}
-
-        <div className="card-foot">
-          <p className="price">
-            <span className={offer.is_free ? 'now free' : 'now'}>
-              {offer.is_free ? 'Free' : money(offer.sale_price)}
-            </span>
-            <s>{money(offer.normal_price)}</s>
-          </p>
-          <TimeLeft endsAt={offer.ends_at} now={now} />
-        </div>
-
-        {offer.is_free && (
-          <a
-            className="claim"
-            href={offer.claim_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(event) => {
-              event.stopPropagation()
-              openInApp(event, offer.store, offer.steam_app_id, offer.claim_url)
-            }}
-          >
-            Claim on {offer.store}
-          </a>
-        )}
-      </div>
+      {offer.genres.length > 0 && (
+        <p className="genres" style={{ fontWeight: 600 }}>
+          {offer.genres.join(' · ')}
+        </p>
+      )}
+      {shortDescription && (
+        <p className="description">{shortDescription}</p>
+      )}
+      {hasReviews && (
+        <p className="game-reviews" style={{ color: 'var(--text-dim)', fontWeight: 600, margin: '4px 0 8px' }}>
+          {Math.round(offer.review_positive_percent!)}% positive
+          {' · '}
+          {offer.review_total!.toLocaleString('en-US')} reviews on {offer.review_source}
+        </p>
+      )}
+      <p className="price">
+        {offer.is_free ? (
+          <>
+            <s>${offer.normal_price.toFixed(2)}</s>{' '}
+            <strong style={{ color: 'var(--ok)' }}>Free right now</strong>
+          </>
+        ) : (
+          <>
+            <s>${offer.normal_price.toFixed(2)}</s>{' '}
+            <span style={{ color: 'var(--ok)' }}>${offer.sale_price.toFixed(2)}</span>
+          </>
+        )}{' '}
+        <span className="savings">−{Math.round(offer.savings)}%</span>
+      </p>
+      <p className="time-left" style={{ margin: 0 }}>Ending soon</p>
     </li>
-  )
-}
-
-function Pill({ label, pressed, color, onClick }: { label: string; pressed: boolean; color?: string; onClick: () => void }) {
-  return (
-    <button type="button" className="pill" aria-pressed={pressed} onClick={onClick}>
-      {color && <span className="dot" style={{ background: color }} />}
-      {label}
-    </button>
   )
 }
 
@@ -193,56 +90,22 @@ function App() {
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [freeLoad, setFreeLoad] = useState<FreeLoad>({ state: 'loading' })
   const [openedAt] = useState(() => Date.now())
-  const [now, setNow] = useState(() => Date.now())
   const [stores, setStores] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [showTimeFilter, setShowTimeFilter] = useState(false)
   const [genres, setGenres] = useState<string[]>([])
   const [endingWithinDays, setEndingWithinDays] = useState<number | null>(null)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [atTop, setAtTop] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null)
   const [requirementsOpen, setRequirementsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
-  const searchInput = useRef<HTMLInputElement>(null)
-  const topbar = useRef<HTMLElement>(null)
-  const filterBar = useRef<HTMLDivElement>(null)
-
-  // The filter bar sticks right below the top bar, so the CSS needs to know how
-  // tall both are. They change with the screen width, e.g. search gets its own row on mobile.
-  useEffect(() => {
-    const root = document.documentElement
-    const observer = new ResizeObserver(() => {
-      root.style.setProperty('--topbar-height', `${topbar.current?.offsetHeight ?? 0}px`)
-      root.style.setProperty('--filter-bar-height', `${filterBar.current?.offsetHeight ?? 0}px`)
-    })
-    if (topbar.current) observer.observe(topbar.current)
-    if (filterBar.current) observer.observe(filterBar.current)
-    return () => observer.disconnect()
-  }, [load.state])
 
   useEffect(() => {
     const onScroll = () => setAtTop(window.scrollY < 400)
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
-  // Keeps the countdowns on the cards ticking.
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30_000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  // "/" jumps to the search field, like on GitHub and YouTube.
-  useEffect(() => {
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement
-      if (event.key === '/' && !typing) {
-        event.preventDefault()
-        searchInput.current?.focus()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   useEffect(() => {
@@ -337,18 +200,8 @@ function App() {
     [freeGames, genres, matchesSearch],
   )
 
-  const anyFilter = stores.length + genres.length > 0 || endingWithinDays !== null
-
-  const clearFilters = () => {
-    setStores([])
-    setGenres([])
-    setEndingWithinDays(null)
-  }
-
-  const goToPage = (page: number) => {
-    setCurrentPage(page)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+  const activeFilters = stores.length + genres.length + (endingWithinDays !== null ? 1 : 0)
+  const anyFilter = activeFilters > 0
 
   const copyLink = async (url: string) => {
     try {
@@ -367,7 +220,7 @@ function App() {
   if (load.state === 'error') {
     return (
       <div className="status">
-        <h1 className="logo">Game<span>Grab</span></h1>
+        <h1>GameGrab</h1>
         <p className="error">Can't reach the backend: {load.message}</p>
         <p>Check that the server is running on {API_URL}</p>
       </div>
@@ -376,210 +229,246 @@ function App() {
 
   return (
     <>
-      <header className="topbar" ref={topbar}>
-        <div className="wrap topbar-inner">
-          <h1 className="logo">Game<span>Grab</span></h1>
+      <header>
+        <div>
+          <h1>Game<span style={{ color: '#4ade80' }}>Grab</span></h1>
+          <p>Free and discounted PC games, all in one place.</p>
+        </div>
+        <Account />
+      </header>
 
-          <label className="search">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
+      <div className="layout">
+        <aside>
+          <button
+            type="button"
+            className="filter-toggle"
+            onClick={() => setFiltersOpen((current) => !current)}
+            aria-expanded={filtersOpen}
+            aria-controls="filter-panel"
+          >
+            <span>Filter{anyFilter && ` (${activeFilters})`}</span>
+            <span aria-hidden="true">{filtersOpen ? '−' : '+'}</span>
+          </button>
+
+          <div id="filter-panel" className={filtersOpen ? 'filter-panel open' : 'filter-panel'}>
+            <h2>Store</h2>
+            {STORES.map((store) => (
+              <label key={store} className="filter-option">
+                <input
+                  type="checkbox"
+                  checked={stores.includes(store)}
+                  onChange={() => setStores((current) => toggle(current, store))}
+                />
+                {store}
+              </label>
+            ))}
+
+            <h2>Genre</h2>
+            {allGenres.map((genre) => (
+              <label key={genre} className="filter-option">
+                <input
+                  type="checkbox"
+                  checked={genres.includes(genre)}
+                  onChange={() => setGenres((current) => toggle(current, genre))}
+                />
+                {genre}
+              </label>
+            ))}
+
+            <button
+              type="button"
+              onClick={() => {
+                setStores([])
+                setGenres([])
+                setEndingWithinDays(null)
+              }}
+              disabled={!anyFilter}
+            >
+              Show all
+            </button>
+          </div>
+        </aside>
+
+        <main>
+          <div className="search-bar">
+            <span className="search-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                <circle cx="10.5" cy="10.5" r="7.5" />
+                <line x1="16" y1="16" x2="22.5" y2="22.5" />
+              </svg>
+            </span>
             <input
-              ref={searchInput}
               type="search"
-              placeholder={`Search ${load.offers.length.toLocaleString('en-US')} deals…`}
-              aria-label="Search for games"
+              placeholder="Search for games..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <kbd>/</kbd>
-          </label>
-
-          <Account />
-        </div>
-      </header>
-
-      {/* Outside the top bar, so it scrolls away while the logo and search stay. */}
-      <div className="wrap intro">
-        <p className="tagline">Free and discounted PC games, all in one place.</p>
-      </div>
-
-      <div className="filter-bar" ref={filterBar}>
-        <div className="wrap filters">
-          <div className="filter-row">
-            <span className="filter-label">Store</span>
-            {STORES.map((store) => (
-              <Pill
-                key={store}
-                label={store}
-                color={STORE_COLORS[store]}
-                pressed={stores.includes(store)}
-                onClick={() => setStores((current) => toggle(current, store))}
-              />
-            ))}
-          </div>
-
-          <div className="filter-row">
-            <span className="filter-label">Genre</span>
-            {allGenres.map((genre) => (
-              <Pill
-                key={genre}
-                label={genre}
-                pressed={genres.includes(genre)}
-                onClick={() => setGenres((current) => toggle(current, genre))}
-              />
-            ))}
-          </div>
-
-          <div className="filter-row">
-            <span className="filter-label">Ends</span>
-            <div className="segmented">
-              {TIME_OPTIONS.map((option) => (
-                <button
-                  key={option.label}
-                  type="button"
-                  aria-pressed={endingWithinDays === option.days}
-                  onClick={() => setEndingWithinDays(option.days)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            {anyFilter && (
-              <button type="button" className="clear-filters" onClick={clearFilters}>
-                Clear filters
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <main className="wrap">
-        <section className="section">
-          <div className="section-head">
-            <div>
-              <h2>Free right now</h2>
-              <p className="section-sub">Claim them before the timer runs out. They're yours to keep.</p>
-            </div>
-          </div>
-
-          {freeOffers.length > 0 ? (
-            <ul className="grid grid-free">
-              {freeOffers.map((offer) => (
-                <OfferCard key={offer.id} offer={offer} now={now} onOpen={() => setSelectedOffer(offer)} />
-              ))}
-            </ul>
-          ) : (
-            <p className="count">
-              {searchTerm.trim() || anyFilter
-                ? 'No free offers match your search or filters.'
-                : 'No current free offers. Check back later!'}
-            </p>
-          )}
-
-          <div className="f2p-banner">
-            <span>
-              <strong>Looking for games that are always free?</strong>{' '}
-              {freeGames.length > 0 && `${freeGames.length} popular free-to-play titles.`}
-            </span>
             <button
+              className="search-action"
               type="button"
-              className="link-button"
-              onClick={() =>
-                document
-                  .getElementById('always-free')
-                  ?.scrollIntoView({ behavior: 'smooth' })
-              }
+              onClick={() => setShowTimeFilter(!showTimeFilter)}
             >
-              Browse free-to-play ↓
+              ☰
             </button>
-          </div>
-        </section>
-
-        <section className="section">
-          <div className="section-head">
-            <h2>Big discounts</h2>
-            {discountedOffers.length > 0 && (
-              <p className="count">
-                <strong>{discountedOffers.length.toLocaleString('en-US')}</strong> games at 80% off or more
-              </p>
+            {showTimeFilter && (
+              <div className="time-filter">
+                {[1, 7].map((days) => (
+                  <label key={days} className="filter-option">
+                    <input
+                      type="checkbox"
+                      name="time-left"
+                      checked={endingWithinDays === days}
+                      onChange={() =>
+                        setEndingWithinDays(endingWithinDays === days ? null : days)
+                      }
+                    />
+                    Ends in {days} {days === 1 ? 'day' : 'days'}
+                  </label>
+                ))}
+              </div>
             )}
           </div>
 
-          {discountedOffers.length > 0 ? (
-            <ul className="grid">
-              {paginatedOffers.map((offer) => (
-                <OfferCard key={offer.id} offer={offer} now={now} onOpen={() => setSelectedOffer(offer)} />
-              ))}
-            </ul>
-          ) : (
-            <p className="count">
-              {searchTerm.trim() || anyFilter
-                ? 'No discounted games match your search or filters.'
-                : 'No discounted games available right now.'}
-            </p>
-          )}
-        </section>
-
-        {totalPages > 1 && (
-          <div className="pagination">
-            <button type="button" onClick={() => goToPage(Math.max(1, safePage - 1))} disabled={safePage === 1}>
-              ← Previous
-            </button>
-            <span className="page-indicator">
-              {safePage} / {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => goToPage(Math.min(totalPages, safePage + 1))}
-              disabled={safePage === totalPages}
-            >
-              Next →
-            </button>
-          </div>
-        )}
-
-        {freeLoad.state !== 'loading' && (
-          <section className="always-free" id="always-free">
-            <div className="section-head">
-              <h2>Popular free-to-play games</h2>
-              {freeLoad.state === 'ok' && visibleFree.length > 0 && (
-                <p className="count">
-                  <strong>{visibleFree.length}</strong> games, most played first
+          <section className="free-to-play-preview">
+            <div className="free-to-play-preview-content">
+              <div>
+                <h2>Free-to-Play games</h2>
+                <p>
+                  Discover games that are always free to play,
+                  not just temporarily free.
                 </p>
-              )}
+              </div>
+
+              <button
+                type="button"
+                className="free-to-play-button"
+                onClick={() =>
+                  document
+                    .getElementById('always-free')
+                    ?.scrollIntoView({ behavior: 'smooth' })
+                }
+              >
+                <span>Explore Free-to-Play</span>
+                <span className="free-to-play-arrow" aria-hidden="true">↓</span>
+              </button>
             </div>
-            {freeLoad.state === 'error' ? (
-              <p className="error">Couldn't fetch the list of free games.</p>
-            ) : visibleFree.length > 0 ? (
-              <ul className="free-games">
-                {visibleFree.map((game) => (
-                  <li key={game.id}>
-                    <a
-                      href={game.claim_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(event) => openInApp(event, 'Steam', game.steam_app_id, game.claim_url)}
-                    >
-                      {game.title}
-                    </a>
-                    {game.genres.length > 0 && (
-                      <span className="genres">{game.genres.slice(0, 3).join(' · ')}</span>
-                    )}
-                  </li>
+          </section>
+
+          <section className="limited-free">
+            <h2>Free for a limited time</h2>
+            <p>Games that are temporarily free to claim.</p>
+
+            {freeOffers.length > 0 ? (
+              <ul className="offers">
+                {freeOffers.map((offer) => (
+                  <OfferCard
+                    key={offer.id}
+                    offer={offer}
+                    onClick={() => setSelectedOffer(offer)}
+                  />
                 ))}
               </ul>
             ) : (
               <p className="count">
-                {searchTerm.trim() || genres.length > 0
-                  ? 'No Free-to-Play games match your search or filters.'
-                  : 'No Free-to-Play games available right now.'}
+                {searchTerm.trim() || anyFilter
+                  ? 'No free offers match your search or filters.'
+                  : 'No current free offers. Check back later!'}
               </p>
             )}
           </section>
-        )}
-      </main>
+
+          <section className="discounted-games">
+            <h2>Discounted games</h2>
+
+            {discountedOffers.length > 0 ? (
+              <p className="count">
+                <strong>{discountedOffers.length}</strong> discounted games
+              </p>
+            ) : (
+              <p className="count">
+                {searchTerm.trim() || anyFilter
+                  ? 'No discounted games match your search or filters.'
+                  : 'No discounted games available right now.'}
+              </p>
+            )}
+
+            <ul className="offers">
+              {paginatedOffers.map((offer) => (
+                <OfferCard key={offer.id} offer={offer} onClick={() => setSelectedOffer(offer)} />
+              ))}
+            </ul>
+          </section>
+
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentPage((p) => Math.max(1, p - 1))
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                disabled={safePage === 1}
+              >
+                ← Previous
+              </button>
+              <span className="page-indicator">
+                {safePage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                disabled={safePage === totalPages}
+              >
+                Next →
+              </button>
+            </div>
+          )}
+
+          {freeLoad.state !== 'loading' && (
+            <section className="always-free" id="always-free">
+              <h2>Popular free games</h2>
+              {freeLoad.state === 'error' ? (
+                <p className="error">Couldn't fetch the list of free games.</p>
+              ) : (
+                <>
+                  {visibleFree.length > 0 ? (
+                    <p className="count">
+                      <strong>{visibleFree.length}</strong> free to play games
+                    </p>
+                  ) : (
+                    <p className="count">
+                      {searchTerm.trim() || genres.length > 0
+                        ? 'No Free-to-Play games match your search or filters.'
+                        : 'No Free-to-Play games available right now.'}
+                    </p>
+                  )}
+
+                  <ul className="free-games">
+                    {visibleFree.map((game) => (
+                      <li key={game.id}>
+                        <a
+                          href={game.claim_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(event) => openInApp(event, 'Steam', game.steam_app_id, game.claim_url)}
+                        >
+                          {game.title}
+                        </a>
+                        {game.genres.length > 0 && (
+                          <span className="genres">{game.genres.slice(0, 3).join(' · ')}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </section>
+          )}
+        </main>
+      </div>
 
       <button
         type="button"
@@ -592,68 +481,66 @@ function App() {
 
       {selectedOffer && (
         <div className="modal-overlay" onClick={() => setSelectedOffer(null)}>
-          <div className="modal" role="dialog" aria-modal="true" aria-label={selectedOffer.title} onClick={(e) => e.stopPropagation()}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', overflow: 'visible' }}>
             <button className="modal-close" onClick={() => setSelectedOffer(null)} aria-label="Close">
               ×
             </button>
-
-            <GameImage offer={selectedOffer} className="media modal-media">
-              <span className="badge">
-                {selectedOffer.is_free ? 'FREE' : `−${Math.round(selectedOffer.savings)}%`}
-              </span>
-            </GameImage>
-
-            <div className="modal-content">
-              <StoreChip store={selectedOffer.store} />
-              <h2>{selectedOffer.title}</h2>
+            {selectedOffer.thumb && (
+              <img className="modal-image" src={selectedOffer.thumb} alt={selectedOffer.title} style={{ height: '110px' }} />
+            )}
+            <div className="modal-content" style={{ padding: '12px 14px' }}>
+              <span className="store" style={{ fontSize: '11px' }}>{selectedOffer.store}</span>
+              <h2 style={{ fontSize: '17px', margin: '2px 0 6px' }}>{selectedOffer.title}</h2>
 
               {selectedOffer.genres.length > 0 && (
-                <p className="genres">{selectedOffer.genres.join(' · ')}</p>
-              )}
-
-              {hasReviews(selectedOffer) && (
-                <p className="rating">
-                  {Math.round(selectedOffer.review_positive_percent!)}% positive
-                  {' · '}
-                  {selectedOffer.review_total!.toLocaleString('en-US')} reviews on {selectedOffer.review_source}
+                <p style={{ margin: '4px 0', fontSize: '12px' }}>
+                  <strong style={{ color: 'var(--text)' }}>Genres</strong>{' '}
+                  <span style={{ color: 'var(--text-dim)' }}>{selectedOffer.genres.join(' · ')}</span>
                 </p>
               )}
 
-              {selectedOffer.launcher_notice && (
-                <p className="launcher-warning">Also requires {selectedOffer.launcher_notice}</p>
+              {selectedOffer.description && (
+                <>
+                  <p style={{ margin: '8px 0 2px', fontWeight: 600, color: 'var(--text)', fontSize: '12px' }}>Description</p>
+                  <p className="description" style={{ fontSize: '12px', margin: '0 0 6px', lineHeight: 1.35 }}>{selectedOffer.description}</p>
+                </>
               )}
 
-              {selectedOffer.description && <p className="description">{selectedOffer.description}</p>}
-
-              <div className="modal-facts">
-                <div>
-                  <span>Price</span>
-                  <p className="price">
-                    <span className={selectedOffer.is_free ? 'now free' : 'now'}>
-                      {selectedOffer.is_free ? 'Free' : money(selectedOffer.sale_price)}
-                    </span>
-                    <s>{money(selectedOffer.normal_price)}</s>
+              {selectedOffer.review_positive_percent !== null &&
+                selectedOffer.review_total !== null &&
+                selectedOffer.review_total > 0 &&
+                selectedOffer.review_source && (
+                  <p style={{ color: 'var(--text-dim)', fontWeight: 600, fontSize: '12px', margin: '6px 0' }}>
+                    {Math.round(selectedOffer.review_positive_percent)}% positive
+                    {' · '}
+                    {selectedOffer.review_total.toLocaleString('en-US')} reviews on {selectedOffer.review_source}
                   </p>
-                </div>
-                <div>
-                  <span>Time left</span>
-                  <TimeLeft endsAt={selectedOffer.ends_at} now={now} />
-                </div>
-              </div>
+                )}
 
               {(selectedOffer.minimum_requirements || selectedOffer.recommended_requirements) && (
-                <div className="system-requirements">
+                <div style={{ marginTop: '8px' }}>
                   <button
                     type="button"
-                    className="requirements-button"
-                    aria-expanded={requirementsOpen}
                     onClick={() => setRequirementsOpen((v) => !v)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text)',
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                      padding: '4px 0',
+                    }}
                   >
                     <span>System requirements</span>
-                    <span aria-hidden="true">{requirementsOpen ? '−' : '+'}</span>
+                    <span>{requirementsOpen ? '−' : '+'}</span>
                   </button>
                   {requirementsOpen && (
-                    <div className="requirements-content">
+                    <div className="requirements-content" style={{ marginTop: '4px', fontSize: '11px', maxHeight: '50px', overflowY: 'auto' }}>
                       {selectedOffer.minimum_requirements && (
                         <div>
                           <h4>Minimum</h4>
@@ -671,7 +558,31 @@ function App() {
                 </div>
               )}
 
-              <div className="modal-actions">
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                <div style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '6px', padding: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '2px' }}>Price</div>
+                  <p className="price" style={{ margin: 0, fontSize: '12px' }}>
+                    {selectedOffer.is_free ? (
+                      <>
+                        <s>${selectedOffer.normal_price.toFixed(2)}</s>{' '}
+                        <strong style={{ color: 'var(--ok)' }}>Free right now</strong>
+                      </>
+                    ) : (
+                      <>
+                        <s>${selectedOffer.normal_price.toFixed(2)}</s>{' '}
+                        <span style={{ color: 'var(--ok)' }}>${selectedOffer.sale_price.toFixed(2)}</span>
+                      </>
+                    )}{' '}
+                    <span className="savings">−{Math.round(selectedOffer.savings)}%</span>
+                  </p>
+                </div>
+                <div style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '6px', padding: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '2px' }}>Time Left</div>
+                  <div style={{ fontWeight: 600, fontSize: '12px' }}>{timeLeft(selectedOffer.ends_at) || '—'}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
                 <a
                   href={selectedOffer.claim_url}
                   target="_blank"
@@ -679,11 +590,17 @@ function App() {
                   onClick={(event) =>
                     openInApp(event, selectedOffer.store, selectedOffer.steam_app_id, selectedOffer.claim_url)
                   }
-                  className="claim"
+                  className="primary-button"
+                  style={{ textAlign: 'center', padding: '7px 10px', fontSize: '13px' }}
                 >
                   Get it on {selectedOffer.store} →
                 </a>
-                <button type="button" className="share-button" onClick={() => copyLink(selectedOffer.claim_url)}>
+                <button
+                  type="button"
+                  className="share-button"
+                  onClick={() => copyLink(selectedOffer.claim_url)}
+                  style={{ width: '100%', padding: '7px 10px', fontSize: '13px' }}
+                >
                   {copied ? 'Copied!' : 'Copy link'}
                 </button>
               </div>

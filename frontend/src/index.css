@@ -1,165 +1,53 @@
-/* The colors are taken straight from docs/design_1.png. */
+/* The colors are taken straight from docs/design_1.png.
+   The layout is still bare-bones – only the palette is in place. */
 
 :root {
   /* Backgrounds, lighter the closer they are to the viewer. */
   --bg: #14151a; /* the page */
   --surface: #1b1d25; /* the cards */
-  --surface-2: #22252f; /* things on top of a card */
   --line: #23252f; /* borders */
   --line-strong: #2d2f38;
 
   /* Shades of white, from headings down to the least important. */
   --text: #edeef2; /* headings and titles */
-  --text-dim: #9aa1ad; /* store, prices, filter options */
-  --text-faint: #656d7a; /* footnotes and technical info */
-
-  /* The green from the logo. Also used for prices and "Free". */
-  --accent: #4ade80;
-  --accent-ink: #062b14; /* text on top of the green */
-
-  /* The filter headings (Store, Genre, Ends): white, with a glow in the green from the logo. */
-  --label: var(--text);
-  --label-glow: rgba(74, 222, 128, 0.5);
-  --label-glow-wide: rgba(74, 222, 128, 0.2);
+  --text-dim: #888e96; /* store, prices, filter options */
+  --text-faint: #585d63; /* footnotes and technical info */
 
   /* Status colors. Not part of the palette, but they carry information. */
   --ok: #4ade80;
   --error: #f87171;
   --warn: #fbbf24;
 
-  /* One color per store, used as a small dot next to the name. */
-  --steam: #66c0f4;
-  --gog: #c084fc;
-  --epic: #e5e7eb;
-
-  --font-display: 'Bricolage Grotesque', 'Figtree', system-ui, sans-serif;
-  --font-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --radius: 14px;
-
-  /* Makes the browser draw scrollbars and other controls dark. */
+  /* Makes the browser draw checkboxes and other controls dark. */
   color-scheme: dark;
-}
-
-* {
-  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.45;
+  padding: 24px;
+  font-family: system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
 }
 
-button,
-input {
-  font: inherit;
-  color: inherit;
+h1 {
+  margin: 0 0 4px;
 }
 
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* Everything is centered and stops growing on very wide screens. */
-.wrap {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding-inline: 24px;
-}
-
-/* ---------- Top bar: logo, search and account ---------- */
-
-/* Logo, search and account stay at the top while scrolling. The tagline
-   below it scrolls away. */
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 20; /* keeps the login panel above the filter bar */
-  background: rgba(20, 21, 26, 0.85);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-
-.topbar-inner {
+/* Title on the left, the account on the right. */
+header {
   display: flex;
-  align-items: center;
-  gap: 32px;
-  padding-block: 16px 10px;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  margin-bottom: 20px;
 }
 
-.logo {
+header p {
   margin: 0;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 38px;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.logo span {
-  color: var(--accent);
-}
-
-.intro {
-  padding-block: 8px 28px;
-}
-
-/* Same white as the filter headings, without their glow. */
-.tagline {
-  margin: 0;
-  font-size: 16px;
-  color: var(--label);
-}
-
-/* Fills the space between the logo and the account. Squarer and lighter than
-   the filter buttons, so it reads as a text field and not as another filter. */
-.search {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--surface-2);
-  border: 1px solid #363a47;
-  border-radius: 10px;
-  color: var(--text-faint);
-  cursor: text;
-  transition: border-color 0.15s;
-}
-
-.search:focus-within {
-  border-color: var(--accent);
-}
-
-.search svg {
-  flex: none;
-}
-
-.search input {
-  flex: 1;
-  min-width: 0;
-  background: none;
-  border: 0;
-  outline: none;
-  color: var(--text);
-}
-
-.search input::placeholder {
-  color: var(--text-faint);
-}
-
-.search kbd {
-  font: inherit;
-  font-size: 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  padding: 1px 7px;
+  color: var(--text-dim);
 }
 
 /* Login, or who is logged in. The form opens as a panel below the button. */
@@ -168,7 +56,6 @@ input {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-left: auto;
 }
 
 .account-email {
@@ -181,8 +68,8 @@ input {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  padding: 7px 16px;
+  border-radius: 6px;
+  padding: 6px 12px;
   font: inherit;
   font-size: 14px;
   white-space: nowrap;
@@ -192,21 +79,6 @@ input {
 .account button:hover,
 .auth-form button:hover {
   border-color: var(--text-dim);
-}
-
-/* The only action in the top bar, so it's a filled button rather than another pill. */
-.account .login-button {
-  padding: 9px 18px;
-  background: var(--text);
-  color: var(--bg);
-  border-color: var(--text);
-  border-radius: 10px;
-  font-weight: 700;
-}
-
-.account .login-button:hover {
-  background: #ffffff;
-  border-color: #ffffff;
 }
 
 .auth-form {
@@ -221,8 +93,7 @@ input {
   padding: 16px;
   background: var(--surface);
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+  border-radius: 8px;
 }
 
 .auth-form p {
@@ -244,7 +115,7 @@ input {
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--line-strong);
-  border-radius: 8px;
+  border-radius: 6px;
 }
 
 .auth-form .hint {
@@ -270,9 +141,8 @@ input {
 }
 
 .auth-form button.primary {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-color: var(--accent);
+  background: var(--text);
+  color: var(--bg);
   font-weight: 700;
 }
 
@@ -281,638 +151,180 @@ input {
   cursor: default;
 }
 
-/* ---------- Filters ---------- */
-
-/* Sticks right below the top bar, so the filters are always at hand. */
-.filter-bar {
-  position: sticky;
-  top: var(--topbar-height, 0px);
-  border-top: 1px solid var(--line);
-  z-index: 15;
-  background: rgba(20, 21, 26, 0.85);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--line);
-}
-
-/* "Browse free-to-play" shouldn't land underneath the sticky bars. */
-html {
-  scroll-padding-top: calc(var(--topbar-height, 0px) + var(--filter-bar-height, 0px) + 16px);
-}
-
-/* minmax(0, 1fr) lets the rows scroll instead of making the page wider. */
-.filters {
+/* Filters on the left, list on the right. */
+.layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 2px;
-  padding-block: 8px;
+  grid-template-columns: 180px 1fr;
+  gap: 0;
+  align-items: start;
 }
 
-/* One row per filter. Long rows (genres) scroll sideways instead of wrapping.
-   The scrolling clips anything outside the row, so the padding (taken back by
-   the negative margin) leaves room for the glow around the headings. */
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding: 6px 10px;
-  margin-inline: -10px;
+/* Sticky sidebar – stays visible when scrolling */
+aside {
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding-right: 20px;
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 13px;
 }
 
-.filter-row::-webkit-scrollbar {
+main {
+  padding-left: 24px;
+}
+
+/* The button that expands the filters. Only used on mobile, see the bottom of the file. */
+.filter-toggle {
   display: none;
 }
 
-/* The headings glow a little, so they read as headings next to the buttons. */
-.filter-label {
-  flex: none;
-  min-width: 64px;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--label);
-  text-shadow: 0 0 6px var(--label-glow), 0 0 14px var(--label-glow-wide);
-  white-space: nowrap;
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  flex: none;
-  padding: 6px 14px;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
+aside h2 {
   font-size: 14px;
-  color: var(--text-dim);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  margin: 0 0 4px;
 }
 
-.pill:hover {
-  color: var(--text);
-  border-color: var(--text-faint);
+/* Line above Genre */
+aside h2:nth-of-type(2) {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-/* A selected filter is filled, so it's obvious at a glance what is active. */
-.pill[aria-pressed='true'] {
-  background: var(--text);
-  border-color: var(--text);
-  color: var(--bg);
+/* Space between the filter groups, for example before "Genre". */
+.filter-option + h2 {
+  margin-top: 12px;
 }
 
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex: none;
-}
-
-/* Only one option can be active, so it looks like one control instead of separate pills. */
-.segmented {
-  display: inline-flex;
-  flex: none;
-  padding: 3px;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-}
-
-.segmented button {
-  padding: 4px 12px;
-  background: none;
-  border: 0;
-  border-radius: 999px;
-  font-size: 14px;
-  color: var(--text-dim);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.segmented button[aria-pressed='true'] {
-  background: var(--surface-2);
-  color: var(--text);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
-}
-
-.clear-filters {
-  flex: none;
-  background: none;
-  border: 0;
-  padding: 6px 4px;
-  font-size: 14px;
-  color: var(--accent);
-  cursor: pointer;
-}
-
-.clear-filters:hover {
-  text-decoration: underline;
-}
-
-/* ---------- Sections ---------- */
-
-.section {
-  padding-top: 28px;
-}
-
-.section-head {
+.filter-option {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px 16px;
-  margin-bottom: 16px;
-}
-
-.section-head h2,
-.always-free h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: clamp(22px, 2.6vw, 28px);
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
-
-.section-sub {
-  margin: 4px 0 0;
+  align-items: center;
+  width: fit-content;
+  white-space: nowrap;
+  gap: 6px;
+  padding: 2px 0;
+  cursor: pointer;
   color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* The selected filter should stand out more than the unselected ones. */
+.filter-option:has(input:checked) {
+  color: var(--text);
+}
+
+aside button {
+  margin-top: 8px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+aside button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+/* "Time left" sits on its own below "Show all", with space above. */
+.time-filter {
+  margin-top: 0;
+  position: absolute;
+  right: 12px;
+  top: calc(100% + 10px);
 }
 
 .count {
-  margin: 0;
+  margin: 0 0 16px;
   color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
 }
 
 .count strong {
   color: var(--text);
 }
 
-.f2p-banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 24px;
-  padding: 14px 18px;
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--radius);
-  color: var(--text-dim);
-}
-
-.f2p-banner strong {
-  color: var(--text);
-}
-
-.link-button {
-  background: none;
-  border: 0;
-  padding: 0;
-  font-weight: 600;
-  color: var(--accent);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.link-button:hover {
-  text-decoration: underline;
-}
-
-/* ---------- Game cards ---------- */
-
-.grid {
+.offers {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
 }
 
-/* Few free games at a time, so they get a little more room. */
-.grid-free {
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-}
-
-.card {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+.offers li {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-  cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.card:hover,
-.card:focus-visible {
-  transform: translateY(-4px);
-  border-color: var(--line-strong);
-  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.8);
-}
-
-/* Same shape as Steam's header image (460×215), so it's never cropped. */
-.media {
-  position: relative;
-  aspect-ratio: 460 / 215;
-  max-width: 100%;
-  overflow: hidden;
-  background: var(--surface-2);
-}
-
-/* A blurred copy of the image behind it fills the space when the image has
-   another shape, like Epic's portrait covers. */
-.media-blur {
-  position: absolute;
-  inset: -20px;
-  background-size: cover;
-  background-position: center;
-  filter: blur(18px) brightness(0.55);
-}
-
-.media img {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  transition: transform 0.35s ease;
-}
-
-.card:hover .media img {
-  transform: scale(1.04);
-}
-
-/* The discount is the first thing you see. */
-.badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 1;
-  padding: 3px 9px;
-  background: var(--accent);
-  color: var(--accent-ink);
   border-radius: 8px;
-  font-size: 14px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  padding: 12px;
 }
 
-.store-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px 3px 8px;
-  background: rgba(10, 12, 16, 0.72);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.media .store-chip {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 1;
-}
-
-.card-body {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  gap: 6px;
-  padding: 14px 16px 16px;
-}
-
-.card h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-}
-
-.genres {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-dim);
-}
-
-.rating {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-
-.meter {
-  flex: none;
-  width: 44px;
-  height: 5px;
-  background: var(--line-strong);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.meter i {
+/* The image shown at the top of each game card. */
+.game-image {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
   display: block;
-  height: 100%;
-  border-radius: 3px;
-}
-
-.launcher-warning {
-  align-self: flex-start;
-  margin: 2px 0 0;
-  padding: 2px 8px;
-  border: 1px solid var(--warn);
   border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.offers h3 {
+  margin: 4px 0 8px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.store {
   font-size: 12px;
-  color: var(--warn);
-}
-
-/* Price and time left always sit at the bottom, level across a row. */
-.card-foot {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
-
-.price {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.price .now {
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.price .free {
-  color: var(--accent);
-}
-
-/* The struck-through regular price should fade behind the sale price. */
-.price s {
-  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--text-faint);
 }
 
-.timer {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+/* The genres on the card: supporting info, as muted as the price. */
+.genres {
+  margin: 0 0 8px;
   font-size: 13px;
   color: var(--text-dim);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Less than a day left. */
-.timer.soon {
-  color: var(--warn);
-}
-
-.timer svg {
-  flex: none;
-}
-
-.claim {
-  display: block;
-  margin-top: 6px;
-  padding: 9px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-radius: 10px;
-  font-weight: 700;
-  text-align: center;
-  text-decoration: none;
-}
-
-.claim:hover {
-  filter: brightness(1.08);
-}
-
-/* On the cards the button is only outlined. Filled, five of them in a row
-   were louder than the games themselves. The modal keeps the filled one. */
-.card .claim {
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid rgba(74, 222, 128, 0.45);
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.card .claim:hover {
-  filter: none;
-  background: rgba(74, 222, 128, 0.12);
-  border-color: var(--accent);
-}
-
-/* ---------- Popular free-to-play: compact rows instead of cards ---------- */
-
-.always-free {
-  margin-top: 48px;
-  padding-block: 28px 64px;
-  border-top: 1px solid var(--line);
-}
-
-.free-games {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 4px 24px;
-}
-
-.free-games li {
-  padding: 8px 0;
-  border-bottom: 1px solid var(--line);
-  font-size: 14px;
-}
-
-.free-games a {
-  display: block;
-  color: var(--text);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.free-games a:hover {
-  color: var(--accent);
-}
-
-.free-games .genres {
-  display: block;
-  margin-top: 2px;
-  font-size: 12px;
-}
-
-/* ---------- Pagination ---------- */
-
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1.5rem;
-  margin: 2.5rem 0 0;
-}
-
-.pagination button {
-  min-width: 110px;
-  padding: 0.6rem 1.2rem;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.pagination button:hover:not(:disabled) {
-  border-color: var(--text-dim);
-}
-
-.pagination button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.page-indicator {
-  min-width: 70px;
-  font-size: 15px;
-  font-weight: 600;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ---------- Details modal ---------- */
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.75);
-}
-
-.modal {
-  position: relative;
-  width: 100%;
-  max-width: 560px;
-  max-height: calc(100vh - 40px);
-  overflow-y: auto;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-}
-
-.modal-close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 2;
-  width: 32px;
-  height: 32px;
-  background: rgba(10, 12, 16, 0.72);
-  border: 1px solid var(--line-strong);
-  border-radius: 50%;
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.modal-content {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 18px 20px 20px;
-}
-
-.modal-content h2 {
-  margin: 2px 0 0;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 24px;
-  letter-spacing: -0.01em;
-  text-wrap: balance;
-}
-
-.modal-content .store-chip {
-  background: var(--surface-2);
 }
 
 .description {
-  margin: 4px 0 0;
-  font-size: 14px;
-  line-height: 1.5;
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.4;
   color: var(--text-dim);
+
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.modal-facts {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  width: 100%;
-  margin-top: 8px;
-}
-
-.modal-facts > div {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-}
-
-.modal-facts > div > span:first-child {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-faint);
-}
-
+/* Expandable system requirements on offer cards. */
 .system-requirements {
-  width: 100%;
+  margin: 0 0 10px;
 }
 
 .requirements-button {
+  width: 100%;
+  padding: 7px 9px;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  padding: 8px 12px;
+
   background: transparent;
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  font-size: 14px;
   color: var(--text-dim);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+
+  font: inherit;
+  font-size: 12px;
   text-align: left;
   cursor: pointer;
 }
@@ -923,13 +335,16 @@ html {
 }
 
 .requirements-content {
-  max-height: 200px;
+  max-height: 240px;
   overflow-y: auto;
+
   margin-top: 8px;
-  padding: 10px 12px;
+  padding: 10px;
+
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 6px;
+
   font-size: 12px;
   line-height: 1.45;
   color: var(--text-dim);
@@ -954,25 +369,63 @@ html {
   margin-bottom: 0;
 }
 
-.modal-actions {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  width: 100%;
-  margin-top: 8px;
-}
-
-.modal-actions .claim {
-  margin: 0;
-}
-
-.share-button {
-  padding: 9px 16px;
-  background: transparent;
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  font-size: 14px;
+.price {
+  margin: 0 0 8px;
   color: var(--text-dim);
+}
+
+/* The struck-through regular price should fade behind the sale price. */
+.price s {
+  color: var(--text-faint);
+}
+
+.price strong,
+.savings {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.price .free {
+  color: var(--ok);
+}
+
+/* How long the offer lasts. Full strength, since that's what makes
+   people click now instead of later. */
+.time-left {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* The link is the most important click on the page, so it gets full strength. */
+.offers a {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.offers a:hover {
+  border-bottom-color: var(--text);
+}
+
+/* Actions at the bottom of each offer card. */
+.offer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Secondary action for copying the offer link. */
+.share-button {
+  min-width: 72px;
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 5px 9px;
+  font: inherit;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -981,14 +434,95 @@ html {
   border-color: var(--text-dim);
 }
 
-/* ---------- Misc ---------- */
-
 .status {
   padding: 24px;
 }
 
+.backend-info {
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.ok {
+  color: var(--ok);
+}
+
 .error {
   color: var(--error);
+}
+
+main > h2 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+/* Smaller section below the offers: compact rows instead of cards. */
+.always-free {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.always-free h2 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+.free-games {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 24px;
+}
+
+.free-games li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.free-games a {
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.free-games a:hover {
+  text-decoration: underline;
+}
+
+.free-games .genres {
+  display: block;
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+
+.launcher-warning {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 3px 8px;
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--warn);
+}
+
+.jump-button,
+.to-top-button {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.jump-button {
+  margin-bottom: 16px;
+  padding: 6px 12px;
 }
 
 /* Fixed to the viewport, so it stays on screen while scrolling. */
@@ -998,71 +532,184 @@ html {
   bottom: 24px;
   z-index: 10;
   padding: 10px 16px;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  font-size: 14px;
-  cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
+.jump-button:hover,
 .to-top-button:hover {
   border-color: var(--text-dim);
 }
 
-/* Nothing to go back to at the top, so it would only be in the way. */
-.to-top-button.at-top {
-  display: none;
+.search-bar {
+  display: flex;
+  position: relative;
+  align-items: center;
+  gap: 12px;
+
+  width: 100%;
+  max-width: 520px;
+  margin: 0 0 20px 0;
+
+  padding: 8px 14px;
+
+  border-radius: 999px;
+  background: rgba(93, 120, 138, 0.35);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(180, 200, 210, 0.35);
 }
 
-/* ---------- Mobile ---------- */
+.search-icon {
+  font-size: 20px;
+  color: rgba(238, 243, 244, 0.8);
+  flex-shrink: 0;
+}
 
+.search-bar input {
+  width: 100%;
+
+  border: none;
+  outline: none;
+
+  background: transparent;
+
+  font-size: 1rem;
+  color: #ffffff;
+}
+
+.search-bar input::placeholder {
+  color: rgba(238, 243, 244, 0.6);
+}
+
+.search-action {
+  border: 1px solid rgba(180, 200, 210, 0.35);
+  background: rgba(93, 120, 138, 0.28);
+  color: #eef3f4;
+
+  padding: 8px 14px;
+  border-radius: 6px;
+
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  margin: 2.5rem 0;
+}
+
+.pagination button {
+  padding: 0.6rem 1.2rem;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  min-width: 110px;
+}
+
+.pagination button:hover:not(:disabled) {
+  border-color: var(--text-dim);
+}
+
+.pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-indicator {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 70px;
+  text-align: center;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  max-width: 640px;
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.modal-image {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 12px 12px 0 0;
+}
+
+.modal-content {
+  padding: 20px;
+}
+
+.modal-content h2 {
+  margin: 8px 0 12px;
+  font-size: 24px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.primary-button {
+  background: var(--text);
+  color: var(--bg);
+  padding: 10px 16px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.primary-button:hover {
+  opacity: 0.9;
+}
+
+/* Mobile. The sidebar would take half the screen and push the cards out to the
+   side, so everything goes in one column and the filters fold up behind a button. */
 @media (max-width: 700px) {
-  .wrap {
-    padding-inline: 16px;
-  }
-
-  /* Logo and account on the first row, search across the whole second row. */
-  .topbar-inner {
-    flex-wrap: wrap;
-    gap: 12px;
-    padding-block: 14px 10px;
-  }
-
-  .search {
-    order: 1;
-    flex-basis: 100%;
-    max-width: none;
-  }
-
-  .search kbd {
-    display: none;
-  }
-
-  .intro {
-    padding-block: 6px 20px;
-  }
-
-  .tagline {
-    font-size: 14px;
-  }
-
-  /* Three rows of filters would cover a big part of a phone screen, so here
-     they scroll away with the page. */
-  .filter-bar {
-    position: static;
-    background: none;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border-bottom: 0;
-  }
-
-  html {
-    scroll-padding-top: calc(var(--topbar-height, 0px) + 16px);
-  }
-
-  .logo {
-    font-size: 30px;
+  body {
+    padding: 16px 16px 88px; /* Room at the bottom so "Top" doesn't cover the last game. */
   }
 
   /* A long email shouldn't push the title together. */
@@ -1073,42 +720,181 @@ html {
     white-space: nowrap;
   }
 
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  /* Disable sticky on mobile */
+  aside {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+    border-right: none;
+    font-size: 14px;
+  }
+
+  main {
+    padding-left: 0;
+  }
+
+  aside .filter-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    min-height: 44px;
+    margin: 0;
+    padding: 0 14px;
+    font: inherit;
+  }
+
+  .filter-panel {
+    display: none;
+  }
+
+  /* Two columns of options, so the list takes half the height. Headings,
+     "Show all" and "Time left" span the whole width. */
+  .filter-panel.open {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 16px;
+    margin-top: 12px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  .filter-panel > h2,
+  .filter-panel > button,
+  .time-filter {
+    grid-column: 1 / -1;
+  }
+
+  .filter-panel > button {
+    justify-self: start;
+  }
+
+  .time-filter {
+    margin-top: 20px;
+  }
+
+  /* Bigger rows, easier to hit with a finger. */
+  .filter-option {
+    padding: 8px 0;
+  }
+
+  .search-bar {
+    max-width: none;
+    margin: 12px 0 16px;
+    transform: none;
+    box-sizing: border-box;
+  }
+
   /* At least 44px high, Apple's and Google's recommendation for touch. */
   .account button,
+  aside button,
+  .jump-button,
   .requirements-button,
-  .share-button,
-  .claim,
-  .pagination button {
+  .share-button {
     min-height: 44px;
   }
 
-  .pill {
-    padding-block: 8px;
-  }
-
-  .always-free {
-    padding-bottom: 88px; /* Room at the bottom so "Top" doesn't cover the last game. */
+  .offer-actions {
+    justify-content: space-between;
   }
 
   .to-top-button {
     right: 16px;
     bottom: 16px;
   }
+
+  /* Nothing to go back to at the top, so it would only be in the way. */
+  .to-top-button.at-top {
+    display: none;
+  }
 }
 
-/* No lifting or zooming for people who have asked for less motion. */
-@media (prefers-reduced-motion: reduce) {
-  .card,
-  .media img {
-    transition: none;
-  }
+.game-reviews {
+  font-size: 0.85rem;
+  color: #888;
+  margin: 0.5rem 0;
+}
 
-  .card:hover,
-  .card:focus-visible {
-    transform: none;
-  }
+.game-reviews strong {
+  color: inherit;
+  font-weight: 600;
+}
 
-  .card:hover .media img {
-    transform: none;
+/* Separate limited-time free offers from discounted games */
+.limited-free {
+  margin-bottom: 3rem;
+}
+
+.limited-free > p {
+  color: #999;
+  margin-bottom: 1rem;
+}
+
+.discounted-games {
+  margin-top: 1rem;
+}
+
+/* Free-to-Play preview on the homepage */
+.free-to-play-preview {
+  background: #1b1d25;
+  border: 1px solid #2b2e38;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin: 1.5rem 0 2.5rem;
+}
+
+.free-to-play-preview-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.free-to-play-preview h2 {
+  font-size: 1.3rem;
+  margin: 0 0 0.5rem;
+}
+
+.free-to-play-preview p {
+  color: #999;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.free-to-play-button {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: #2b303b;
+  border: 1px solid #454b59;
+  border-radius: 6px;
+  color: #fff;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.free-to-play-arrow {
+  font-size: 1rem;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.free-to-play-button:hover {
+  background: #373d4a;
+}
+
+@media (max-width: 600px) {
+  .free-to-play-preview-content {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
