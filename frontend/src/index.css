@@ -79,7 +79,9 @@ input {
   position: sticky;
   top: 0;
   z-index: 20; /* keeps the login panel above the filter bar */
-  background: var(--bg);
+  background: rgba(20, 21, 26, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .topbar-inner {
@@ -287,7 +289,9 @@ input {
   top: var(--topbar-height, 0px);
   border-top: 1px solid var(--line);
   z-index: 15;
-  background: var(--bg);
+  background: rgba(20, 21, 26, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
 }
 
