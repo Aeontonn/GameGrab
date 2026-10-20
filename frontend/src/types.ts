@@ -4,7 +4,7 @@ export type Offer = {
   id: number
   title: string
 
-  // Steam, GOG or Epic Games. What we filter on.
+  // Steam, GOG, Epic Games or Ubisoft. What we filter on.
   store: string
 
   normal_price: number
@@ -60,4 +60,4 @@ export type FreeGame = {
 }
 
 // The stores we fetch from. Used to build the filter.
-export const STORES = ['Steam', 'GOG', 'Epic Games'] as const
+export const STORES = ['Steam', 'GOG', 'Epic Games', 'Ubisoft'] as const

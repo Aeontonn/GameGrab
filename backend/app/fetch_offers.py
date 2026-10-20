@@ -42,6 +42,7 @@ STORES = {
     "1": "Steam",
     "7": "GOG",
     "25": "Epic Games",
+    "13": "Ubisoft",
 }
 
 
@@ -504,8 +505,12 @@ def add_end_dates(rows: list[dict]) -> None:
             row["ends_at"] = steam.get(row["steam_app_id"])
         elif row["store"] == "Epic Games":
             row["ends_at"] = epic.get(normalize_title(row["title"]))
-        elif row["is_free"] or row["savings"] >= MIN_SHOWN_SAVINGS:
+        elif row["store"] == "GOG" and (
+            row["is_free"] or row["savings"] >= MIN_SHOWN_SAVINGS
+        ):
             row["ends_at"] = gog_end_date(row["title"])
+        else:
+            row["ends_at"] = None
 
 
 # Longest block (seconds) we are willing to sit out inside one run.
@@ -635,6 +640,19 @@ def collect(start_page: int) -> tuple[list[dict], int]:
     # free (normal price 0) are not offers – fetch_free_games.py handles them.
     for deal in fetch_page(storeID=store_ids, pageSize=PAGE_SIZE, upperPrice=0):
         if float(deal["normalPrice"]) > 0:
+            deals[deal["dealID"]] = deal
+
+    # Fetch Ubisoft deals separately every run.
+    # Ubisoft has few deals, so they can be checked without pagination.
+    ubisoft_deals = fetch_page(
+        storeID="13",
+        pageSize=PAGE_SIZE,
+        sortBy="Savings",
+        onSale=1,
+    )
+
+    for deal in ubisoft_deals:
+        if float(deal["savings"]) >= MIN_SHOWN_SAVINGS:
             deals[deal["dealID"]] = deal
 
     # The key is dealID, so the same offer can only appear once.

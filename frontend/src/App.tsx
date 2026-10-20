@@ -71,7 +71,11 @@ function OfferCard({ offer, onClick }: { offer: Offer; onClick: () => void }) {
         )}{' '}
         <span className="savings">−{Math.round(offer.savings)}%</span>
       </p>
-      <p className="time-left" style={{ margin: 0 }}>Ending soon</p>
+      {offer.ends_at && (
+        <p className="time-left" style={{ margin: 0 }}>
+          {timeLeft(offer.ends_at)}
+        </p>
+      )}
     </li>
   )
 }
