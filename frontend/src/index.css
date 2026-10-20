@@ -438,6 +438,43 @@ aside button:disabled {
   padding: 24px;
 }
 
+/* Shown while the offers load. Centered on the screen with a slow pulse, so
+   it's clear something is happening during a long wait. The height leaves out
+   the body's padding, so the page doesn't scroll. */
+.splash {
+  min-height: calc(100vh - 48px);
+  min-height: calc(100dvh - 48px);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.splash h1 {
+  margin: 0;
+  font-size: clamp(48px, 12vw, 88px);
+  letter-spacing: -0.03em;
+  animation: splash-pulse 1.6s ease-in-out infinite;
+}
+
+.splash p {
+  margin: 0;
+  color: var(--text-dim);
+}
+
+@keyframes splash-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash h1 {
+    animation: none;
+  }
+}
+
 .backend-info {
   font-size: 13px;
   color: var(--text-faint);

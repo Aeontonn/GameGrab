@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Account from './Account'
-import { API_URL, fetchFreeGames, fetchOffers } from './api'
+import { API_URL, fetchFreeGames, fetchOfferDetails, fetchOffers } from './api'
 import { openInApp } from './appLink'
 import { STORES } from './types'
-import type { FreeGame, Offer } from './types'
+import type { FreeGame, Offer, OfferDetails } from './types'
 
 const toggle = (list: string[], value: string) =>
   list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
@@ -23,10 +23,29 @@ const withoutRequirementLabel = (value: string): string =>
 
 const ITEMS_PER_PAGE = 40
 
-function OfferCard({ offer, onClick }: { offer: Offer; onClick: () => void }) {
-  const shortDescription = offer.description
-    ? offer.description.split('.')[0].trim() + '.'
-    : null
+// How long the mouse has to rest on a card before its details are fetched.
+// Short enough to finish before most clicks, long enough that just moving the
+// mouse across the grid doesn't fetch every card it passes.
+const PREFETCH_DELAY_MS = 120
+
+function OfferCard({
+  offer,
+  onClick,
+  onPrefetch,
+}: {
+  offer: Offer
+  onClick: () => void
+  onPrefetch: () => void
+}) {
+  const prefetchTimer = useRef<number | undefined>(undefined)
+
+  const startPrefetch = () => {
+    window.clearTimeout(prefetchTimer.current)
+    prefetchTimer.current = window.setTimeout(onPrefetch, PREFETCH_DELAY_MS)
+  }
+  const cancelPrefetch = () => window.clearTimeout(prefetchTimer.current)
+
+  useEffect(() => cancelPrefetch, [])
 
   const hasReviews =
     offer.review_positive_percent !== null &&
@@ -35,7 +54,14 @@ function OfferCard({ offer, onClick }: { offer: Offer; onClick: () => void }) {
     offer.review_source
 
   return (
-    <li onClick={onClick} style={{ cursor: 'pointer' }}>
+    <li
+      onClick={onClick}
+      // Fetches the details while the mouse rests on the card, so they're
+      // usually there before the window opens.
+      onMouseEnter={startPrefetch}
+      onMouseLeave={cancelPrefetch}
+      style={{ cursor: 'pointer' }}
+    >
       {offer.thumb && <img className="game-image" src={offer.thumb} alt={offer.title} />}
       <span className="store">{offer.store}</span>
       <h3>{offer.title}</h3>
@@ -47,8 +73,8 @@ function OfferCard({ offer, onClick }: { offer: Offer; onClick: () => void }) {
           {offer.genres.join(' · ')}
         </p>
       )}
-      {shortDescription && (
-        <p className="description">{shortDescription}</p>
+      {offer.short_description && (
+        <p className="description">{offer.short_description}</p>
       )}
       {hasReviews && (
         <p className="game-reviews" style={{ color: 'var(--text-dim)', fontWeight: 600, margin: '4px 0 8px' }}>
@@ -99,6 +125,12 @@ function App() {
   const [atTop, setAtTop] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null)
+  const [details, setDetails] = useState<OfferDetails | 'loading' | 'error'>('loading')
+  // Finished details by offer id, and requests still on their way, so hovering
+  // and then clicking the same card only asks the backend once.
+  const detailsCache = useRef(new Map<number, OfferDetails>())
+  const detailsRequests = useRef(new Map<number, Promise<OfferDetails>>())
+  const [slowStart, setSlowStart] = useState(false)
   const [requirementsOpen, setRequirementsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -107,6 +139,15 @@ function App() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  // The backend sleeps on Render's free plan when nobody has used it for a while,
+  // and waking it up takes up to a minute. If the offers haven't come after a few
+  // seconds, the loading screen says so, so it doesn't look like the page is broken.
+  useEffect(() => {
+    if (load.state !== 'loading') return
+    const timer = window.setTimeout(() => setSlowStart(true), 5000)
+    return () => window.clearTimeout(timer)
+  }, [load.state])
 
   useEffect(() => {
     fetchOffers()
@@ -119,6 +160,53 @@ function App() {
       .then((games) => setFreeLoad({ state: 'ok', games }))
       .catch(() => setFreeLoad({ state: 'error' }))
   }, [])
+
+  // Starts fetching an offer's details, unless they're already here or on their way.
+  const loadDetails = useCallback((id: number): Promise<OfferDetails> => {
+    const saved = detailsCache.current.get(id)
+    if (saved) return Promise.resolve(saved)
+
+    let request = detailsRequests.current.get(id)
+    if (!request) {
+      request = fetchOfferDetails(id)
+        .then((fetched) => {
+          detailsCache.current.set(id, fetched)
+          return fetched
+        })
+        .finally(() => detailsRequests.current.delete(id))
+      // A hover prefetch nobody waits for shouldn't show up as an uncaught error.
+      // The window handles the error itself if the game is opened.
+      request.catch(() => {})
+      detailsRequests.current.set(id, request)
+    }
+    return request
+  }, [])
+
+  // The full description and system requirements aren't part of /offers, so
+  // they're fetched when a game is hovered or opened. Saved, so opening the same
+  // game again is instant.
+  useEffect(() => {
+    if (!selectedOffer) return
+    const saved = detailsCache.current.get(selectedOffer.id)
+    if (saved) {
+      setDetails(saved)
+      return
+    }
+
+    setDetails('loading')
+    // Ignores the answer if another game was opened before it came.
+    let current = true
+    loadDetails(selectedOffer.id)
+      .then((fetched) => {
+        if (current) setDetails(fetched)
+      })
+      .catch(() => {
+        if (current) setDetails('error')
+      })
+    return () => {
+      current = false
+    }
+  }, [selectedOffer, loadDetails])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -214,7 +302,12 @@ function App() {
   }
 
   if (load.state === 'loading') {
-    return <p className="status">Fetching offers…</p>
+    return (
+      <div className="splash" role="status">
+        <h1>Game<span style={{ color: '#4ade80' }}>Grab</span></h1>
+        <p>{slowStart ? 'Waking up the server. This can take up to a minute…' : 'Fetching the latest deals…'}</p>
+      </div>
+    )
   }
 
   if (load.state === 'error') {
@@ -365,6 +458,7 @@ function App() {
                     key={offer.id}
                     offer={offer}
                     onClick={() => setSelectedOffer(offer)}
+                    onPrefetch={() => loadDetails(offer.id)}
                   />
                 ))}
               </ul>
@@ -394,7 +488,12 @@ function App() {
 
             <ul className="offers">
               {paginatedOffers.map((offer) => (
-                <OfferCard key={offer.id} offer={offer} onClick={() => setSelectedOffer(offer)} />
+                <OfferCard
+                  key={offer.id}
+                  offer={offer}
+                  onClick={() => setSelectedOffer(offer)}
+                  onPrefetch={() => loadDetails(offer.id)}
+                />
               ))}
             </ul>
           </section>
@@ -499,10 +598,16 @@ function App() {
                 </p>
               )}
 
-              {selectedOffer.description && (
+              {details === 'loading' && (
+                <p className="description" style={{ fontSize: '12px', margin: '8px 0 6px' }}>Loading description…</p>
+              )}
+              {details === 'error' && (
+                <p className="description" style={{ fontSize: '12px', margin: '8px 0 6px' }}>Couldn't load the description.</p>
+              )}
+              {typeof details === 'object' && details.description && (
                 <>
                   <p style={{ margin: '8px 0 2px', fontWeight: 600, color: 'var(--text)', fontSize: '12px' }}>Description</p>
-                  <p className="description" style={{ fontSize: '12px', margin: '0 0 6px', lineHeight: 1.35 }}>{selectedOffer.description}</p>
+                  <p className="description" style={{ fontSize: '12px', margin: '0 0 6px', lineHeight: 1.35 }}>{details.description}</p>
                 </>
               )}
 
@@ -517,7 +622,7 @@ function App() {
                   </p>
                 )}
 
-              {(selectedOffer.minimum_requirements || selectedOffer.recommended_requirements) && (
+              {typeof details === 'object' && (details.minimum_requirements || details.recommended_requirements) && (
                 <div style={{ marginTop: '8px' }}>
                   <button
                     type="button"
@@ -541,16 +646,16 @@ function App() {
                   </button>
                   {requirementsOpen && (
                     <div className="requirements-content" style={{ marginTop: '4px', fontSize: '11px', maxHeight: '50px', overflowY: 'auto' }}>
-                      {selectedOffer.minimum_requirements && (
+                      {details.minimum_requirements && (
                         <div>
                           <h4>Minimum</h4>
-                          <p>{withoutRequirementLabel(selectedOffer.minimum_requirements)}</p>
+                          <p>{withoutRequirementLabel(details.minimum_requirements)}</p>
                         </div>
                       )}
-                      {selectedOffer.recommended_requirements && (
+                      {details.recommended_requirements && (
                         <div>
                           <h4>Recommended</h4>
-                          <p>{withoutRequirementLabel(selectedOffer.recommended_requirements)}</p>
+                          <p>{withoutRequirementLabel(details.recommended_requirements)}</p>
                         </div>
                       )}
                     </div>
