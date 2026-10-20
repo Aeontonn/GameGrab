@@ -175,11 +175,9 @@ function App() {
     )
   }, [load, stores, genres, endingWithinDays, openedAt, matchesSearch])
 
-  // Separate temporarily free offers from discounted games.
   const freeOffers = visible.filter((offer) => offer.is_free)
   const discountedOffers = visible.filter((offer) => !offer.is_free)
 
-  // Pagination only applies to discounted games.
   const totalPages = Math.max(
     1,
     Math.ceil(discountedOffers.length / ITEMS_PER_PAGE),
@@ -187,7 +185,6 @@ function App() {
 
   const safePage = Math.min(currentPage, totalPages)
 
-  // Only show discounted games from the current page.
   const paginatedOffers = discountedOffers.slice(
     (safePage - 1) * ITEMS_PER_PAGE,
     safePage * ITEMS_PER_PAGE,
@@ -234,7 +231,7 @@ function App() {
     <>
       <header>
         <div>
-          <h1>GameGrab</h1>
+          <h1>Game<span style={{ color: '#4ade80' }}>Grab</span></h1>
           <p>Free and discounted PC games, all in one place.</p>
         </div>
         <Account />
@@ -293,7 +290,6 @@ function App() {
         </aside>
 
         <main>
-          <h2>Free and on sale</h2>
           <div className="search-bar">
             <span className="search-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -358,7 +354,6 @@ function App() {
             </div>
           </section>
 
-          {/* Temporarily free offers */}
           <section className="limited-free">
             <h2>Free for a limited time</h2>
             <p>Games that are temporarily free to claim.</p>
@@ -367,9 +362,9 @@ function App() {
               <ul className="offers">
                 {freeOffers.map((offer) => (
                   <OfferCard
-                  key={offer.id}
-                  offer={offer}
-                  onClick={() => setSelectedOffer(offer)}
+                    key={offer.id}
+                    offer={offer}
+                    onClick={() => setSelectedOffer(offer)}
                   />
                 ))}
               </ul>
@@ -382,28 +377,27 @@ function App() {
             )}
           </section>
 
-        {/* Discounted games */}
-        <section className="discounted-games">
-          <h2>Discounted games</h2>
+          <section className="discounted-games">
+            <h2>Discounted games</h2>
 
-          {discountedOffers.length > 0 ? (
-            <p className="count">
-              <strong>{discountedOffers.length}</strong> discounted games
-            </p>
-          ) : (
-            <p className="count">
-              {searchTerm.trim() || anyFilter
-                ? 'No discounted games match your search or filters.'
-                : 'No discounted games available right now.'}
-            </p>
-          )}
+            {discountedOffers.length > 0 ? (
+              <p className="count">
+                <strong>{discountedOffers.length}</strong> discounted games
+              </p>
+            ) : (
+              <p className="count">
+                {searchTerm.trim() || anyFilter
+                  ? 'No discounted games match your search or filters.'
+                  : 'No discounted games available right now.'}
+              </p>
+            )}
 
-          <ul className="offers">
-            {paginatedOffers.map((offer) => (
-              <OfferCard key={offer.id} offer={offer} onClick={() => setSelectedOffer(offer)} />
-            ))}
-          </ul>
-        </section>
+            <ul className="offers">
+              {paginatedOffers.map((offer) => (
+                <OfferCard key={offer.id} offer={offer} onClick={() => setSelectedOffer(offer)} />
+              ))}
+            </ul>
+          </section>
 
           {totalPages > 1 && (
             <div className="pagination">
@@ -440,7 +434,6 @@ function App() {
                 <p className="error">Couldn't fetch the list of free games.</p>
               ) : (
                 <>
-
                   {visibleFree.length > 0 ? (
                     <p className="count">
                       <strong>{visibleFree.length}</strong> free to play games
@@ -448,8 +441,8 @@ function App() {
                   ) : (
                     <p className="count">
                       {searchTerm.trim() || genres.length > 0
-                      ? 'No Free-to-Play games match your search or filters.'
-                      : 'No Free-to-Play games available right now.'}
+                        ? 'No Free-to-Play games match your search or filters.'
+                        : 'No Free-to-Play games available right now.'}
                     </p>
                   )}
 
