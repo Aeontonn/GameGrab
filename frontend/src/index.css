@@ -40,10 +40,13 @@ header {
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  margin-bottom: 20px;
 }
 
 header p {
-  margin: 0 0 24px;
+  margin: 0;
   color: var(--text-dim);
 }
 
@@ -152,7 +155,7 @@ header p {
 .layout {
   display: grid;
   grid-template-columns: 180px 1fr;
-  gap: 32px;
+  gap: 0;
   align-items: start;
 }
 
@@ -162,6 +165,13 @@ aside {
   top: 24px;
   max-height: calc(100vh - 48px);
   overflow-y: auto;
+  padding-right: 20px;
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 13px;
+}
+
+main {
+  padding-left: 24px;
 }
 
 /* The button that expands the filters. Only used on mobile, see the bottom of the file. */
@@ -170,13 +180,20 @@ aside {
 }
 
 aside h2 {
-  font-size: 16px;
-  margin: 0 0 8px;
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+
+/* Line above Genre */
+aside h2:nth-of-type(2) {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 /* Space between the filter groups, for example before "Genre". */
 .filter-option + h2 {
-  margin-top: 20px;
+  margin-top: 12px;
 }
 
 .filter-option {
@@ -185,9 +202,10 @@ aside h2 {
   width: fit-content;
   white-space: nowrap;
   gap: 6px;
-  padding: 4px 0;
+  padding: 2px 0;
   cursor: pointer;
   color: var(--text-dim);
+  font-size: 13px;
 }
 
 /* The selected filter should stand out more than the unselected ones. */
@@ -196,13 +214,14 @@ aside h2 {
 }
 
 aside button {
-  margin-top: 12px;
+  margin-top: 8px;
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--line-strong);
   border-radius: 6px;
-  padding: 6px 12px;
+  padding: 4px 10px;
   cursor: pointer;
+  font-size: 13px;
 }
 
 aside button:disabled {
@@ -528,8 +547,8 @@ main > h2 {
   gap: 12px;
 
   width: 100%;
-  max-width: 460px;
-  margin: 80px 0 24px -0.5px;
+  max-width: 520px;
+  margin: 0 0 20px 0;
 
   padding: 8px 14px;
 
@@ -537,8 +556,6 @@ main > h2 {
   background: rgba(93, 120, 138, 0.35);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(180, 200, 210, 0.35);
-
-  transform: translateY(12px);
 }
 
 .search-icon {
@@ -713,6 +730,13 @@ main > h2 {
     position: static;
     max-height: none;
     overflow: visible;
+    padding-right: 0;
+    border-right: none;
+    font-size: 14px;
+  }
+
+  main {
+    padding-left: 0;
   }
 
   aside .filter-toggle {
