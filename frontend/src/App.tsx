@@ -18,6 +18,32 @@ const timeLeft = (endsAt: string | null): string | null => {
   return days === 1 ? '1 day left' : `${days} days left`
 }
 
+// Exact time left for the cards, e.g. "2 d 4 h left". soon is true for the last
+// 24 hours, so the offers that really are about to end stand out.
+const exactTimeLeft = (endsAt: string | null, now: number): { text: string; soon: boolean } | null => {
+  if (!endsAt) return null
+  const msLeft = new Date(endsAt).getTime() - now
+  if (msLeft <= 0) return { text: 'Ending now', soon: true }
+  const hours = Math.floor(msLeft / 3_600_000)
+  const minutes = Math.floor((msLeft % 3_600_000) / 60_000)
+  if (hours < 24) return { text: `${hours} h ${minutes} min left`, soon: true }
+  return { text: `${Math.floor(hours / 24)} d ${hours % 24} h left`, soon: false }
+}
+
+// The images to try for a card, best first. CheapShark's thumb is only 231×87 and
+// gets blurry when it fills a card, so Steam's bigger images come first: the main
+// capsule (616×353, which most games have), then the double-size header (920×430),
+// then the normal header (460×215). Games without a Steam id only have the thumb.
+const imagesFor = (offer: Offer): string[] => {
+  const steam = offer.steam_app_id
+    ? ['capsule_616x353.jpg', 'header_2x.jpg', 'header.jpg'].map(
+        (file) =>
+          `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${offer.steam_app_id}/${file}`,
+      )
+    : []
+  return offer.thumb ? [...steam, offer.thumb] : steam
+}
+
 const withoutRequirementLabel = (value: string): string =>
   value.replace(/^(Minimum|Recommended):\s*/i, '')
 
@@ -40,12 +66,43 @@ const FILTER_GENRES = [
 // mouse across the grid doesn't fetch every card it passes.
 const PREFETCH_DELAY_MS = 120
 
+// The best image we can find for a game, used on the cards and in the details window.
+function GameImage({ offer }: { offer: Offer }) {
+  const [candidates] = useState(() => imagesFor(offer))
+  const [index, setIndex] = useState(0)
+  const src = candidates[index]
+
+  if (!src) return null
+  return (
+    <img
+      src={src}
+      alt={offer.title}
+      loading="lazy"
+      // Not every game has every size on Steam. Moves on to the next one.
+      onError={() => setIndex((current) => current + 1)}
+    />
+  )
+}
+
+// The game's image with the store on top. Every card gets the
+// same landscape shape; Epic's portrait covers are cropped to fit it.
+function CardImage({ offer }: { offer: Offer }) {
+  return (
+    <div className="card-media">
+      <GameImage offer={offer} />
+      <span className="card-store">{offer.store}</span>
+    </div>
+  )
+}
+
 function OfferCard({
   offer,
+  now,
   onClick,
   onPrefetch,
 }: {
   offer: Offer
+  now: number
   onClick: () => void
   onPrefetch: () => void
 }) {
@@ -65,8 +122,11 @@ function OfferCard({
     offer.review_total > 0 &&
     offer.review_source
 
+  const left = exactTimeLeft(offer.ends_at, now)
+
   return (
     <li
+      className="offer-card"
       onClick={onClick}
       // Fetches the details while the mouse rests on the card, so they're
       // usually there before the window opens.
@@ -74,49 +134,46 @@ function OfferCard({
       onMouseLeave={cancelPrefetch}
       style={{ cursor: 'pointer' }}
     >
-      {offer.thumb && <img className="game-image" src={offer.thumb} alt={offer.title} />}
-      <span className="store">{offer.store}</span>
-      <h3>{offer.title}</h3>
-      {offer.launcher_notice && (
-        <p className="launcher-warning">⚠ Also requires: {offer.launcher_notice}</p>
-      )}
-      {offer.genres.length > 0 && (
-        <p className="genres" style={{ fontWeight: 600 }}>
-          {offer.genres.join(' · ')}
-        </p>
-      )}
-      {offer.short_description && (
-        <p className="description">{offer.short_description}</p>
-      )}
-      {hasReviews && (
-        <p
-          className="game-reviews"
-          style={{ color: 'var(--text-dim)', fontWeight: 600, margin: '4px 0 8px' }}
-        >
-          {Math.round(offer.review_positive_percent!)}% positive
-          {' · '}
-          {offer.review_total!.toLocaleString('en-US')} reviews on {offer.review_source}
-        </p>
-      )}
-      <p className="price">
-        {offer.is_free ? (
-          <>
-            <s>${offer.normal_price.toFixed(2)}</s>{' '}
-            <strong style={{ color: 'var(--ok)' }}>Free right now</strong>
-          </>
-        ) : (
-          <>
-            <s>${offer.normal_price.toFixed(2)}</s>{' '}
-            <span style={{ color: 'var(--ok)' }}>${offer.sale_price.toFixed(2)}</span>
-          </>
-        )}{' '}
-        <span className="savings">−{Math.round(offer.savings)}%</span>
-      </p>
-      {offer.ends_at && (
-        <p className="time-left" style={{ margin: 0 }}>
-          {timeLeft(offer.ends_at)}
-        </p>
-      )}
+      <CardImage offer={offer} />
+
+      <div className="offer-card-body">
+        <h3>{offer.title}</h3>
+        {offer.launcher_notice && (
+          <p className="launcher-warning">⚠ Also requires: {offer.launcher_notice}</p>
+        )}
+        {offer.genres.length > 0 && (
+          <p className="genres" style={{ fontWeight: 600 }}>
+            {offer.genres.join(' · ')}
+          </p>
+        )}
+        {offer.short_description && (
+          <p className="description">{offer.short_description}</p>
+        )}
+        {hasReviews && (
+          <p
+            className="game-reviews"
+            style={{ color: 'var(--text-dim)', fontWeight: 600, margin: '4px 0 8px' }}
+          >
+            {Math.round(offer.review_positive_percent!)}% positive
+            {' · '}
+            {offer.review_total!.toLocaleString('en-US')} reviews on {offer.review_source}
+          </p>
+        )}
+
+        {/* Price and time left always sit at the bottom, level across a row. */}
+        <div className="offer-card-foot">
+          <p className="offer-card-price">
+            <span className={offer.is_free ? 'now free' : 'now'}>
+              {offer.is_free ? 'Free' : `$${offer.sale_price.toFixed(2)}`}
+            </span>
+            <s>${offer.normal_price.toFixed(2)}</s>
+            <span className="savings">−{Math.round(offer.savings)}%</span>
+          </p>
+          <span className={left?.soon ? 'offer-card-time soon' : 'offer-card-time'}>
+            {left ? left.text : 'Ending soon'}
+          </span>
+        </div>
+      </div>
     </li>
   )
 }
@@ -135,6 +192,7 @@ function App() {
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [freeLoad, setFreeLoad] = useState<FreeLoad>({ state: 'loading' })
   const [openedAt] = useState(() => Date.now())
+  const [now, setNow] = useState(() => Date.now())
   const [stores, setStores] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterMenuOpen, setFilterMenuOpen] = useState(false)
@@ -151,6 +209,12 @@ function App() {
   const [slowStart, setSlowStart] = useState(false)
   const [requirementsOpen, setRequirementsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  // Keeps the countdowns on the cards ticking.
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     const onScroll = () => setAtTop(window.scrollY < 400)
@@ -486,6 +550,7 @@ function App() {
                   <OfferCard
                     key={offer.id}
                     offer={offer}
+                    now={now}
                     onClick={() => setSelectedOffer(offer)}
                     onPrefetch={() => loadDetails(offer.id)}
                   />
@@ -520,6 +585,7 @@ function App() {
                 <OfferCard
                   key={offer.id}
                   offer={offer}
+                  now={now}
                   onClick={() => setSelectedOffer(offer)}
                   onPrefetch={() => loadDetails(offer.id)}
                 />
@@ -613,9 +679,10 @@ function App() {
             <button className="modal-close" onClick={() => setSelectedOffer(null)} aria-label="Close">
               ×
             </button>
-            {selectedOffer.thumb && (
-              <img className="modal-image" src={selectedOffer.thumb} alt={selectedOffer.title} style={{ height: '110px' }} />
-            )}
+            {/* Same images as the cards, keyed so a new game never shows the last one's image. */}
+            <div className="card-media modal-media">
+              <GameImage key={selectedOffer.id} offer={selectedOffer} />
+            </div>
             <div className="modal-content" style={{ padding: '12px 14px' }}>
               <span className="store" style={{ fontSize: '11px' }}>{selectedOffer.store}</span>
               <h2 style={{ fontSize: '17px', margin: '2px 0 6px' }}>{selectedOffer.title}</h2>

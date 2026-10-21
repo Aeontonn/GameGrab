@@ -251,14 +251,103 @@ aside button:disabled {
   padding: 12px;
 }
 
-/* The image shown at the top of each game card. */
-.game-image {
-  width: 100%;
-  height: 140px;
-  object-fit: cover;
+/* A game card: image on top, text below, price and time left at the bottom.
+   The cards in a row are as tall as the tallest, so the bottoms line up. */
+.offers .offer-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Same shape as Steam's main capsule (616×353), the image most cards use, so it
+   is shown whole. Images with another shape, like Epic's portrait covers, are
+   cropped to fill it, so every card looks the same. */
+.card-media {
+  position: relative;
+  aspect-ratio: 616 / 353;
+  max-width: 100%;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.card-media img {
   display: block;
-  border-radius: 6px;
-  margin-bottom: 12px;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-store {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 3px 10px;
+  background: rgba(10, 12, 16, 0.75);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.offer-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 12px;
+}
+
+.offer-card .description {
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* On narrow cards the time left drops below the price instead of squeezing it. */
+.offer-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.offer-card-price {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+}
+
+.offer-card-price .now {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.offer-card-price .now.free {
+  color: var(--ok);
+}
+
+/* The struck-through regular price should fade behind the sale price. */
+.offer-card-price s {
+  font-size: 14px;
+  color: var(--text-faint);
+}
+
+.offer-card-time {
+  font-size: 13px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* Less than a day left. */
+.offer-card-time.soon {
+  color: var(--warn);
+  font-weight: 700;
 }
 
 .offers h3 {
@@ -878,10 +967,8 @@ main > h2 {
   z-index: 1;
 }
 
-.modal-image {
-  width: 100%;
-  height: 160px;
-  object-fit: cover;
+/* The game's image at the top of the details window, same shape as on the cards. */
+.modal-media {
   border-radius: 12px 12px 0 0;
 }
 
