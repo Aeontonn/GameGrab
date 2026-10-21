@@ -197,7 +197,12 @@ export default function Account() {
 
   return (
     <div className="account">
-      <button type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
+      <button
+        type="button"
+        className="login-button"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+      >
         {open ? 'Close' : 'Log in'}
       </button>
       {open && <AuthForm onDone={() => setOpen(false)} />}
