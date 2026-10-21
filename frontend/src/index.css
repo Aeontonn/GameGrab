@@ -35,14 +35,6 @@ body {
   background: var(--bg);
 }
 
-/* On wide screens the page stops growing and stays centered, so rows of text
-   and the header don't stretch across the whole window. 1360px still fits
-   five cards per row. */
-#root {
-  max-width: 1360px;
-  margin: 0 auto;
-}
-
 /* Buttons and fields don't take the page's typeface on their own. */
 button,
 input {
