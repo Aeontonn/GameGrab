@@ -26,6 +26,11 @@ from app.fetch_offers import USER_AGENT, engine, looks_adult, looks_like_extra, 
 # How many games the list should contain.
 TARGET = 150
 
+# Popular Steam games that may be missing from the search results.
+EXTRA_STEAM_GAMES = {
+    "730": "Counter-Strike 2",
+}
+
 # Steam's search, filtered on the tag Free to Play (113) and the category
 # "games" (998, i.e. not DLC, demos or soundtracks). Steam sorts by
 # relevance, which in practice means the most played first.
@@ -40,6 +45,7 @@ RESULT = re.compile(
 )
 
 # Steam rate-limits appdetails, so we take it easy.
+
 PAUSE_SECONDS = 0.5
 
 
@@ -57,14 +63,22 @@ def search_candidates(pages: int = 3) -> list[tuple[str, str]]:
         for app_id, title in RESULT.findall(html):
             found.setdefault(app_id, unescape(title))
 
+    # Include selected popular games even if Steam search omits them.
+    for app_id, title in EXTRA_STEAM_GAMES.items():
+        found.setdefault(app_id, title)
+
     return list(found.items())
 
 
+
 def collect() -> list[dict]:
-    """Confirms the candidates with Steam and stops once we have TARGET games."""
+    """Collects TARGET free Steam games, then adds selected popular games."""
     rows: list[dict] = []
 
-    for rank, (app_id, title) in enumerate(search_candidates(), start=1):
+    candidates = search_candidates()
+
+    # Add extra games after the regular candidates have been processed.
+    for rank, (app_id, title) in enumerate(candidates, start=1):
         if len(rows) >= TARGET:
             break
 
@@ -74,9 +88,6 @@ def collect() -> list[dict]:
         details = steam_details(app_id)
         time.sleep(PAUSE_SECONDS)
 
-        # Steam's own answer decides: a real game that is free forever.
-        # is_free distinguishes free to play from a game that is only given
-        # away for free for a short while.
         if (
             details is None
             or details["type"] != "game"
@@ -94,6 +105,99 @@ def collect() -> list[dict]:
                 "claim_url": f"https://store.steampowered.com/app/{app_id}/",
             }
         )
+
+    # Add selected popular games without replacing the regular 150.
+    existing_ids = {row["steam_app_id"] for row in rows}
+
+    for app_id, title in EXTRA_STEAM_GAMES.items():
+        if app_id in existing_ids:
+            continue
+
+        if looks_like_extra(title) or looks_adult(title):
+            continue
+
+        details = steam_details(app_id)
+        time.sleep(PAUSE_SECONDS)
+
+        if (
+            details is None
+            or details["type"] != "game"
+            or not details["is_free"]
+            or details["adult"]
+        ):
+            continue
+
+        rows.append(
+            {
+                "steam_app_id": app_id,
+                "title": title,
+                "genres": details["genres"],
+                "rank": len(rows) + 1,
+                "claim_url": f"https://store.steampowered.com/app/{app_id}/",
+            }
+        )
+
+        existing_ids.add(app_id)
+
+    return rows
+
+
+def check_existing_games(rows: list[dict]) -> list[dict]:
+    """Keep previously saved games unless Steam confirms they are no longer free."""
+
+    new_ids = {row["steam_app_id"] for row in rows}
+
+    with engine.connect() as connection:
+        existing_games = connection.execute(
+            text("""
+                SELECT steam_app_id, title, genres, claim_url
+                FROM free_games
+            """)
+        ).mappings().all()
+
+    for game in existing_games:
+        app_id = str(game["steam_app_id"])
+
+        # Already included in the new Steam fetch.
+        if app_id in new_ids:
+            continue
+
+        print(f"Checking existing game: {game['title']}")
+
+        details = steam_details(app_id)
+        time.sleep(PAUSE_SECONDS)
+
+        # If Steam cannot respond, keep the game for now.
+        if details is None:
+            print("  Steam lookup unavailable - keeping game")
+            keep_game = True
+
+        elif (
+            details["type"] != "game"
+            or not details["is_free"]
+            or details["adult"]
+        ):
+            print("  No longer qualifies - excluding game")
+            keep_game = False
+
+        else:
+            print("  Still free - keeping game")
+            keep_game = True
+
+        if not keep_game:
+            continue
+
+        rows.append(
+            {
+                "steam_app_id": app_id,
+                "title": game["title"],
+                "genres": details["genres"] if details is not None else (game["genres"] or []),
+                "rank": len(rows) + 1,
+                "claim_url": game["claim_url"],
+            }
+        )
+
+        new_ids.add(app_id)
 
     return rows
 
@@ -134,12 +238,19 @@ def main() -> None:
     if not rows:
         raise SystemExit("No games found – leaving the database untouched.")
 
+        # Check previously saved games before deciding what to remove.
+    rows = check_existing_games(rows)
+
+    print(f"  {len(rows)} games after checking existing games")
+
     removed = save(rows)
     if removed:
         print(f"  {removed} games removed")
 
-    print(f"Saved {len(rows)} games, of which {sum(1 for r in rows if r['genres'])} have a genre.")
-
+    print(
+        f"Saved {len(rows)} games, "
+        f"of which {sum(1 for r in rows if r['genres'])} have a genre."
+    )
 
 if __name__ == "__main__":
     main()
