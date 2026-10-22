@@ -57,7 +57,11 @@ export type OfferDetails = {
 export type FreeGame = {
   id: number
   title: string
-  steam_app_id: string
+
+  // Steam, or another store (Riot Games, Battle.net…) for games outside Steam.
+  // Those have no Steam id.
+  store: string
+  steam_app_id: string | null
   claim_url: string
 
   // The game's genres according to Steam, in English. May be empty.

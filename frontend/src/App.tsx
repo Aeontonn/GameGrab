@@ -660,7 +660,7 @@ function App() {
                           href={game.claim_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={(event) => openInApp(event, 'Steam', game.steam_app_id, game.claim_url)}
+                          onClick={(event) => openInApp(event, game.store, game.steam_app_id, game.claim_url)}
                         >
                           {game.title}
                         </a>
