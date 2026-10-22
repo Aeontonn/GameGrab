@@ -18,6 +18,11 @@
   --error: #f87171;
   --warn: #fbbf24;
 
+  /* Typefaces, loaded from Google Fonts in index.html. The display face is for
+     the logo and the section headings, the body face for everything else. */
+  --font-display: 'Bricolage Grotesque', 'Figtree', system-ui, sans-serif;
+  --font-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
   /* Makes the browser draw checkboxes and other controls dark. */
   color-scheme: dark;
 }
@@ -25,13 +30,29 @@
 body {
   margin: 0;
   padding: 24px;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-body);
   color: var(--text);
   background: var(--bg);
 }
 
+/* Buttons and fields don't take the page's typeface on their own. */
+button,
+input {
+  font-family: inherit;
+}
+
 h1 {
   margin: 0 0 4px;
+}
+
+/* The logo and the section headings. The headings inside the filter menu
+   (Store, Genre…) keep the body face. */
+h1,
+main section h2,
+.modal-content h2 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 /* Title on the left, the account on the right. */
@@ -45,9 +66,16 @@ header {
   margin-bottom: 20px;
 }
 
+/* The site's name and what it's for are the first thing a visitor reads. */
+header h1 {
+  font-size: 38px;
+  line-height: 1;
+}
+
 header p {
-  margin: 0;
-  color: var(--text-dim);
+  margin: 8px 0 0;
+  font-size: 16px;
+  color: var(--text);
 }
 
 /* Login, or who is logged in. The form opens as a panel below the button. */
@@ -79,6 +107,22 @@ header p {
 .account button:hover,
 .auth-form button:hover {
   border-color: var(--text-dim);
+}
+
+/* The only action in the header, so it's a filled button. "Log out" keeps the
+   quiet style above. */
+.account .login-button {
+  padding: 9px 18px;
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.account .login-button:hover {
+  background: #ffffff;
+  border-color: #ffffff;
 }
 
 .auth-form {
@@ -259,6 +303,18 @@ aside button:disabled {
   min-width: 0;
   padding: 0;
   overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* The card lifts a little and the image zooms in, so it's clear it can be clicked. */
+.offers .offer-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--line-strong);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+}
+
+.offer-card:hover .card-media img {
+  transform: scale(1.04);
 }
 
 /* Same shape as Steam's main capsule (616×353), the image most cards use, so it
@@ -277,6 +333,7 @@ aside button:disabled {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.35s ease;
 }
 
 .card-store {
@@ -655,6 +712,22 @@ main > h2 {
   border-color: var(--text-dim);
 }
 
+/* The band the search field sits in. It sticks to the top of the screen and has
+   the page's own background, so the cards don't show through behind it. */
+.search-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  padding-block: 12px;
+  margin-bottom: 8px;
+  background: var(--bg);
+}
+
+/* "Explore Free-to-Play" shouldn't land underneath the sticky search band. */
+#always-free {
+  scroll-margin-top: 90px;
+}
+
 .search-bar {
   display: flex;
   position: relative;
@@ -663,11 +736,11 @@ main > h2 {
 
   width: 100%;
   max-width: 520px;
-  margin: 0 0 20px 0;
+  margin: 0;
 
-  padding: 8px 14px;
+  padding: 8px 8px 8px 14px;
 
-  border-radius: 999px;
+  border-radius: 12px;
   background: rgba(93, 120, 138, 0.35);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(180, 200, 210, 0.35);
@@ -695,16 +768,44 @@ main > h2 {
   color: rgba(238, 243, 244, 0.6);
 }
 
+/* Opens the filter menu. Lighter than the search field, with a label, so it
+   reads as a button and not as part of the field. */
 .search-action {
-  border: 1px solid rgba(180, 200, 210, 0.35);
-  background: rgba(93, 120, 138, 0.28);
-  color: #eef3f4;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+
+  border: 1px solid rgba(180, 200, 210, 0.45);
+  background: rgba(93, 120, 138, 0.45);
+  color: #ffffff;
 
   padding: 8px 14px;
-  border-radius: 6px;
+  border-radius: 8px;
 
-  font-size: 0.9rem;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
+}
+
+.search-action:hover {
+  background: rgba(93, 120, 138, 0.6);
+}
+
+/* How many filters are on. Only shown when at least one is. */
+.filter-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--ok);
+  color: #062b14;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 /* Full-screen filter menu. */
@@ -1026,7 +1127,7 @@ main > h2 {
 
   .search-bar {
     max-width: none;
-    margin: 12px 0 16px;
+    margin: 0;
     transform: none;
     box-sizing: border-box;
   }

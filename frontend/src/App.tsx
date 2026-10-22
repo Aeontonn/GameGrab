@@ -405,26 +405,39 @@ function App() {
 
       <div className="layout">
         <main>
-          <div className="search-bar">
-            <span className="search-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                <circle cx="10.5" cy="10.5" r="7.5" />
-                <line x1="16" y1="16" x2="22.5" y2="22.5" />
-              </svg>
-            </span>
-            <input
-              type="search"
-              placeholder="Search for games..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <button
-              className="search-action"
-              type="button"
-              onClick={() => setFilterMenuOpen(true)}
-            >
-              ☰
-            </button>
+          {/* Stays at the top while scrolling, so search and filters are always at hand. */}
+          <div className="search-sticky">
+            <div className="search-bar">
+              <span className="search-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <circle cx="10.5" cy="10.5" r="7.5" />
+                  <line x1="16" y1="16" x2="22.5" y2="22.5" />
+                </svg>
+              </span>
+              <input
+                type="search"
+                placeholder="Search for games..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {/* Says "Filters" in words, since a bare ☰ reads as a menu, and shows
+                  how many filters are on so it's clear when the list is filtered. */}
+              <button
+                className="search-action"
+                type="button"
+                onClick={() => setFilterMenuOpen(true)}
+                aria-label={anyFilter ? `Filters, ${activeFilters} active` : 'Filters'}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" />
+                  <circle cx="16" cy="6" r="2" />
+                  <circle cx="10" cy="12" r="2" />
+                  <circle cx="18" cy="18" r="2" />
+                </svg>
+                Filters
+                {anyFilter && <span className="filter-count">{activeFilters}</span>}
+              </button>
+            </div>
           </div>
 
           {filterMenuOpen && (
