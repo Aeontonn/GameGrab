@@ -230,7 +230,7 @@ def free_games():
         with engine.connect() as connection:
             rows = connection.execute(
                 text("""
-                    SELECT id, title, steam_app_id, claim_url, genres
+                    SELECT id, title, store, steam_app_id, claim_url, genres
                     FROM free_games
                     ORDER BY rank
                 """)

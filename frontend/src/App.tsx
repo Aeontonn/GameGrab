@@ -4,7 +4,6 @@ import { API_URL, fetchFreeGames, fetchOfferDetails, fetchOffers } from './api'
 import { openInApp } from './appLink'
 import { STORES } from './types'
 import type { FreeGame, Offer, OfferDetails } from './types'
-import { manualFreeGames } from './manualFreeGames'
 
 const toggle = (list: string[], value: string) =>
   list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
@@ -312,19 +311,10 @@ function App() {
     document.documentElement.style.scrollbarGutter = 'stable'
   }, [])
 
-  const freeGames = useMemo(() => {
-    const apiGames = freeLoad.state === 'ok' ? freeLoad.games : []
-
-    const existingTitles = new Set(
-      apiGames.map((game) => game.title.trim().toLowerCase())
-    )
-
-    const additionalGames = manualFreeGames.filter(
-      (game) => !existingTitles.has(game.title.trim().toLowerCase())
-    )
-
-    return [...apiGames, ...additionalGames]
-  }, [freeLoad])
+  const freeGames = useMemo(
+    () => (freeLoad.state === 'ok' ? freeLoad.games : []),
+    [freeLoad],
+  )
 
   const matchesSearch = useCallback(
     (title: string) => title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
@@ -657,9 +647,7 @@ function App() {
                           href={game.claim_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={(event) =>
-                            openInApp(event, game.store ?? 'Steam', game.steam_app_id, game.claim_url)
-                          }
+                          onClick={(event) => openInApp(event, game.store, game.steam_app_id, game.claim_url)}
                         >
                           {game.title}
                         </a>

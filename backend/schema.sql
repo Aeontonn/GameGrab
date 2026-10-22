@@ -101,6 +101,18 @@ CREATE TABLE IF NOT EXISTS free_games (
     claim_url       TEXT NOT NULL,
     fetched_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Free to play games outside Steam (Riot Games, Battle.net…) have no Steam
+-- id. They are told apart by store and title instead.
+ALTER TABLE free_games
+ADD COLUMN IF NOT EXISTS store TEXT NOT NULL DEFAULT 'Steam';
+
+ALTER TABLE free_games
+ALTER COLUMN steam_app_id DROP NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS free_games_store_title
+ON free_games (store, title) WHERE steam_app_id IS NULL;
+
 -- Deals that Steam or GOG said are not games (DLC, demos, soundtracks…).
 -- Remembered so fetch_offers.py doesn't look them up again every hour.
 CREATE TABLE IF NOT EXISTS skipped_deals (
