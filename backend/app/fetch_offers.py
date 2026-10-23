@@ -386,13 +386,12 @@ def classify(
 MIN_SHOWN_SAVINGS = 80
 
 
-def steam_end_dates(app_ids: list[str]) -> dict[str, datetime]:
-    """Asks Steam when the sale ends, for many games at a time.
+def steam_store_items(app_ids: list[str]) -> list[dict]:
+    """Asks Steam's store about many games at a time, 100 per request.
 
-    Returns {steam id: end date}. Games without an ongoing sale, or without
-    a known end date, are missing from the result.
+    Batches that fail are left out, so the result can be incomplete.
     """
-    found: dict[str, datetime] = {}
+    found: list[dict] = []
 
     for start in range(0, len(app_ids), 100):
         batch = app_ids[start : start + 100]
@@ -410,19 +409,44 @@ def steam_end_dates(app_ids: list[str]) -> dict[str, datetime]:
 
         try:
             with urlopen(Request(url, headers={"User-Agent": USER_AGENT}), timeout=30) as response:
-                items = json.load(response)["response"].get("store_items", [])
+                found.extend(json.load(response)["response"].get("store_items", []))
         except Exception:
             continue
 
-        for item in items:
-            option = item.get("best_purchase_option") or {}
-            for discount in option.get("active_discounts") or []:
-                if discount.get("discount_end_date"):
-                    found[str(item["appid"])] = datetime.fromtimestamp(
-                        discount["discount_end_date"], tz=timezone.utc
-                    )
+    return found
+
+
+def steam_end_dates(app_ids: list[str]) -> dict[str, datetime]:
+    """Asks Steam when the sale ends, for many games at a time.
+
+    Returns {steam id: end date}. Games without an ongoing sale, or without
+    a known end date, are missing from the result.
+    """
+    found: dict[str, datetime] = {}
+
+    for item in steam_store_items(app_ids):
+        option = item.get("best_purchase_option") or {}
+        for discount in option.get("active_discounts") or []:
+            if discount.get("discount_end_date"):
+                found[str(item["appid"])] = datetime.fromtimestamp(
+                    discount["discount_end_date"], tz=timezone.utc
+                )
 
     return found
+
+
+def steam_adult_ids(app_ids: list[str]) -> set[str]:
+    """The Steam ids among app_ids that Steam marks with an adult descriptor.
+
+    Saved offers are only classified once, when first seen, so a stricter
+    filter never reached them. This re-checks all of them every run, cheaply,
+    since the batch API answers 100 games per request.
+    """
+    return {
+        str(item["appid"])
+        for item in steam_store_items(app_ids)
+        if ADULT_DESCRIPTOR_IDS.intersection(item.get("content_descriptorids") or [])
+    }
 
 
 def epic_end_dates() -> dict[str, datetime]:
@@ -882,6 +906,39 @@ def remember_skipped(deal_ids: list[str]) -> None:
         )
 
 
+def remove_deals(deal_ids: list[str]) -> int:
+    """Deletes these deals from offers right away, instead of waiting for them
+    to go stale. Returns how many rows were removed."""
+    if not deal_ids:
+        return 0
+    with engine.begin() as connection:
+        result = connection.execute(
+            text("DELETE FROM offers WHERE deal_id = ANY(:deal_ids)"),
+            {"deal_ids": deal_ids},
+        )
+    return result.rowcount
+
+
+def remove_adult_offers() -> int:
+    """Removes saved offers that Steam now marks as adult.
+
+    Offers are only classified when first seen, so a game saved before the
+    filter got stricter (or whose markers Steam changed later) would otherwise
+    stay forever: it's refreshed every run and never goes stale. The deals are
+    also remembered as skipped so the next run doesn't save them again.
+    """
+    with engine.connect() as connection:
+        saved = connection.execute(
+            text("SELECT deal_id, steam_app_id FROM offers WHERE steam_app_id IS NOT NULL")
+        ).all()
+
+    adult = steam_adult_ids(sorted({app_id for _, app_id in saved}))
+    deal_ids = [deal_id for deal_id, app_id in saved if app_id in adult]
+
+    remember_skipped(deal_ids)
+    return remove_deals(deal_ids)
+
+
 def forget_old_skipped() -> None:
     """Drops old skipped deals, so the table doesn't grow forever.
 
@@ -919,6 +976,12 @@ def main() -> None:
             continue
 
         cached = known.get(deal_id)
+
+        # Saved offers skip classify, so the title check is repeated here.
+        if cached and looks_adult(deal["title"]):
+            new_skipped.append(deal_id)
+            continue
+
         if cached:
             rows.append(
                 to_row(
@@ -962,6 +1025,7 @@ def main() -> None:
             new_skipped.append(deal_id)
 
     remember_skipped(new_skipped)
+    remove_deals(new_skipped)
     print(f"  {lookups} new deals looked up, {deferred} left for the next run")
     print(f"  {len(rows)} games kept")
     print(f"  {sum(1 for row in rows if row['genres'])} of them have a genre (from Steam or GOG)")
@@ -976,6 +1040,10 @@ def main() -> None:
     # from the same page.
     save_cursor(next_page)
     forget_old_skipped()
+
+    print("Re-checking saved offers for adult content…")
+    removed = remove_adult_offers()
+    print(f"  {removed} removed")
 
     print("Updating Steam reviews…")
     try:
