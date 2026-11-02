@@ -970,6 +970,37 @@ input[type="search"]::-webkit-search-cancel-button {
   gap: 12px;
 }
 
+/* How many games the chosen filters give, updated as boxes are ticked. */
+.filter-menu-counts {
+  display: flex;
+  margin: 0;
+}
+
+.filter-menu-count {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  padding: 0 40px;
+  text-align: center;
+}
+
+.filter-menu-count + .filter-menu-count {
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.filter-menu-count dd {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.filter-menu-count dt {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
 .filter-clear,
 .filter-results {
   min-height: 42px;
@@ -1203,6 +1234,25 @@ input[type="search"]::-webkit-search-cancel-button {
 
   .filter-menu-actions {
     padding-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .filter-menu-counts {
+    order: -1;
+    flex-basis: 100%;
+  }
+
+  .filter-menu-count {
+    flex: 1;
+    padding: 0 6px;
+  }
+
+  .filter-menu-count dd {
+    font-size: 18px;
+  }
+
+  .filter-menu-count dt {
+    font-size: 12px;
   }
 
   .offer-actions {

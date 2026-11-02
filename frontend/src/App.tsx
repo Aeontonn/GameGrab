@@ -649,6 +649,19 @@ function App() {
                     Clear all
                   </button>
 
+                  <dl className="filter-menu-counts" aria-live="polite">
+                    {[
+                      { label: 'Free for a limited time', count: freeOffers.length },
+                      { label: 'Discounted games', count: discountedOffers.length },
+                      { label: 'Free to play', count: visibleFree.length },
+                    ].map(({ label, count }) => (
+                      <div key={label} className="filter-menu-count">
+                        <dt>{label}</dt>
+                        <dd>{count.toLocaleString('sv-SE')}</dd>
+                      </div>
+                    ))}
+                  </dl>
+
                   <div className="filter-menu-actions-right">
                     <button
                       type="button"
