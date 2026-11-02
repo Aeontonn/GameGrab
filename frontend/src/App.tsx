@@ -20,14 +20,31 @@ const timeLeft = (endsAt: string | null): string | null => {
 
 // Exact time left for the cards, e.g. "2 d 4 h left". soon is true for the last
 // 24 hours, so the offers that really are about to end stand out.
-const exactTimeLeft = (endsAt: string | null, now: number): { text: string; soon: boolean } | null => {
+const exactTimeLeft = (
+  endsAt: string | null,
+  now: number
+): { text: string; urgency: 'normal' | 'warning' | 'urgent' } | null => {
   if (!endsAt) return null
+
   const msLeft = new Date(endsAt).getTime() - now
-  if (msLeft <= 0) return { text: 'Ending now', soon: true }
+
+  if (msLeft <= 0) return { text: 'Ending now', urgency: 'urgent' }
+
   const hours = Math.floor(msLeft / 3_600_000)
   const minutes = Math.floor((msLeft % 3_600_000) / 60_000)
-  if (hours < 24) return { text: `${hours} h ${minutes} min left`, soon: true }
-  return { text: `${Math.floor(hours / 24)} d ${hours % 24} h left`, soon: false }
+
+  if (msLeft < 24 * 3_600_000) {
+    return { text: `${hours} h ${minutes} min left`, urgency: 'urgent' }
+  }
+
+  const days = Math.floor(hours / 24)
+  const remainingHours = hours % 24
+
+  if (msLeft <= 48 * 3_600_000) {
+    return { text: `${days} d ${remainingHours} h left`, urgency: 'warning' }
+  }
+
+  return { text: `${days} d ${remainingHours} h left`, urgency: 'normal' }
 }
 
 // The images to try for a card, best first. CheapShark's thumb is only 231×87 and
@@ -169,8 +186,24 @@ function OfferCard({
             <s>${offer.normal_price.toFixed(2)}</s>
             <span className="savings">−{Math.round(offer.savings)}%</span>
           </p>
-          <span className={left?.soon ? 'offer-card-time soon' : 'offer-card-time'}>
-            {left ? left.text : 'Ending soon'}
+            <span className={`offer-card-time ${left?.urgency ?? 'normal'}`}>
+              {left && left.urgency !== 'normal' && (
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+              )}
+              {left ? left.text : 'End date unknown'}
           </span>
         </div>
       </div>
