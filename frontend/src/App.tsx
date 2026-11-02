@@ -18,8 +18,6 @@ const timeLeft = (endsAt: string | null): string | null => {
   return days === 1 ? '1 day left' : `${days} days left`
 }
 
-// Exact time left for the cards, e.g. "2 d 4 h left". soon is true for the last
-// 24 hours, so the offers that really are about to end stand out.
 const exactTimeLeft = (endsAt: string | null, now: number): { text: string; soon: boolean } | null => {
   if (!endsAt) return null
   const msLeft = new Date(endsAt).getTime() - now
@@ -30,10 +28,6 @@ const exactTimeLeft = (endsAt: string | null, now: number): { text: string; soon
   return { text: `${Math.floor(hours / 24)} d ${hours % 24} h left`, soon: false }
 }
 
-// The images to try for a card, best first. CheapShark's thumb is only 231×87 and
-// gets blurry when it fills a card, so Steam's bigger images come first: the main
-// capsule (616×353, which most games have), then the double-size header (920×430),
-// then the normal header (460×215). Games without a Steam id only have the thumb.
 const imagesFor = (offer: Offer): string[] => {
   const steam = offer.steam_app_id
     ? ['capsule_616x353.jpg', 'header_2x.jpg', 'header.jpg'].map(
@@ -61,12 +55,8 @@ const FILTER_GENRES = [
   'Racing',
 ]
 
-// How long the mouse has to rest on a card before its details are fetched.
-// Short enough to finish before most clicks, long enough that just moving the
-// mouse across the grid doesn't fetch every card it passes.
 const PREFETCH_DELAY_MS = 120
 
-// The best image we can find for a game, used on the cards and in the details window.
 function GameImage({ offer }: { offer: Offer }) {
   const [candidates] = useState(() => imagesFor(offer))
   const [index, setIndex] = useState(0)
@@ -78,14 +68,11 @@ function GameImage({ offer }: { offer: Offer }) {
       src={src}
       alt={offer.title}
       loading="lazy"
-      // Not every game has every size on Steam. Moves on to the next one.
       onError={() => setIndex((current) => current + 1)}
     />
   )
 }
 
-// The game's image with the store on top. Every card gets the
-// same landscape shape; Epic's portrait covers are cropped to fit it.
 function CardImage({ offer }: { offer: Offer }) {
   return (
     <div className="card-media">
@@ -128,8 +115,6 @@ function OfferCard({
     <li
       className="offer-card"
       onClick={onClick}
-      // Fetches the details while the mouse rests on the card, so they're
-      // usually there before the window opens.
       onMouseEnter={startPrefetch}
       onMouseLeave={cancelPrefetch}
       style={{ cursor: 'pointer' }}
@@ -160,7 +145,6 @@ function OfferCard({
           </p>
         )}
 
-        {/* Price and time left always sit at the bottom, level across a row. */}
         <div className="offer-card-foot">
           <p className="offer-card-price">
             <span className={offer.is_free ? 'now free' : 'now'}>
@@ -195,6 +179,7 @@ function App() {
   const [now, setNow] = useState(() => Date.now())
   const [stores, setStores] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [submittedSearch, setSubmittedSearch] = useState('')
   const [filterMenuOpen, setFilterMenuOpen] = useState(false)
   const [genres, setGenres] = useState<string[]>([])
   const [endingWithinDays, setEndingWithinDays] = useState<number | null>(null)
@@ -202,15 +187,35 @@ function App() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null)
   const [details, setDetails] = useState<OfferDetails | 'loading' | 'error'>('loading')
-  // Finished details by offer id, and requests still on their way, so hovering
-  // and then clicking the same card only asks the backend once.
   const detailsCache = useRef(new Map<number, OfferDetails>())
   const detailsRequests = useRef(new Map<number, Promise<OfferDetails>>())
   const [slowStart, setSlowStart] = useState(false)
   const [requirementsOpen, setRequirementsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [searchHistory, setSearchHistory] = useState<string[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [searchFocused, setSearchFocused] = useState(false)
+  const historyRef = useRef<HTMLDivElement>(null)
 
-  // Keeps the countdowns on the cards ticking.
+  useEffect(() => {
+    const saved = localStorage.getItem('gamegrab-search-history')
+    if (saved) setSearchHistory(JSON.parse(saved))
+  }, [])
+
+  const saveSearch = (term: string) => {
+    const trimmed = term.trim()
+    if (!trimmed) return
+    const updated = [trimmed, ...searchHistory.filter((s) => s !== trimmed)].slice(0, 3)
+    setSearchHistory(updated)
+    localStorage.setItem('gamegrab-search-history', JSON.stringify(updated))
+  }
+
+  const removeSearch = (term: string) => {
+    const updated = searchHistory.filter((s) => s !== term)
+    setSearchHistory(updated)
+    localStorage.setItem('gamegrab-search-history', JSON.stringify(updated))
+  }
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000)
     return () => window.clearInterval(timer)
@@ -222,9 +227,6 @@ function App() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // The backend sleeps on Render's free plan when nobody has used it for a while,
-  // and waking it up takes up to a minute. If the offers haven't come after a few
-  // seconds, the loading screen says so, so it doesn't look like the page is broken.
   useEffect(() => {
     if (load.state !== 'loading') return
     const timer = window.setTimeout(() => setSlowStart(true), 5000)
@@ -243,7 +245,6 @@ function App() {
       .catch(() => setFreeLoad({ state: 'error' }))
   }, [])
 
-  // Starts fetching an offer's details, unless they're already here or on their way.
   const loadDetails = useCallback((id: number): Promise<OfferDetails> => {
     const saved = detailsCache.current.get(id)
     if (saved) return Promise.resolve(saved)
@@ -256,17 +257,12 @@ function App() {
           return fetched
         })
         .finally(() => detailsRequests.current.delete(id))
-      // A hover prefetch nobody waits for shouldn't show up as an uncaught error.
-      // The window handles the error itself if the game is opened.
       request.catch(() => {})
       detailsRequests.current.set(id, request)
     }
     return request
   }, [])
 
-  // The full description and system requirements aren't part of /offers, so
-  // they're fetched when a game is hovered or opened. Saved, so opening the same
-  // game again is instant.
   useEffect(() => {
     if (!selectedOffer) return
     const saved = detailsCache.current.get(selectedOffer.id)
@@ -276,7 +272,6 @@ function App() {
     }
 
     setDetails('loading')
-    // Ignores the answer if another game was opened before it came.
     let current = true
     loadDetails(selectedOffer.id)
       .then((fetched) => {
@@ -292,7 +287,7 @@ function App() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [stores, genres, endingWithinDays, searchTerm])
+  }, [stores, genres, endingWithinDays, searchTerm, submittedSearch])
 
   useEffect(() => {
     const html = document.documentElement
@@ -317,8 +312,11 @@ function App() {
   )
 
   const matchesSearch = useCallback(
-    (title: string) => title.toLowerCase().includes(searchTerm.trim().toLowerCase()),
-    [searchTerm],
+    (title: string) => {
+      const term = (submittedSearch || searchTerm).trim().toLowerCase()
+      return title.toLowerCase().includes(term)
+    },
+    [searchTerm, submittedSearch],
   )
 
   const visible = useMemo(() => {
@@ -405,38 +403,175 @@ function App() {
 
       <div className="layout">
         <main>
-          {/* Stays at the top while scrolling, so search and filters are always at hand. */}
           <div className="search-sticky">
-            <div className="search-bar">
-              <span className="search-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <circle cx="10.5" cy="10.5" r="7.5" />
-                  <line x1="16" y1="16" x2="22.5" y2="22.5" />
-                </svg>
-              </span>
-              <input
-                type="search"
-                placeholder="Search for games..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              {/* Says "Filters" in words, since a bare ☰ reads as a menu, and shows
-                  how many filters are on so it's clear when the list is filtered. */}
-              <button
-                className="search-action"
-                type="button"
-                onClick={() => setFilterMenuOpen(true)}
-                aria-label={anyFilter ? `Filters, ${activeFilters} active` : 'Filters'}
+            <div className="search-wrapper" style={{ position: 'relative' }}>
+              <div 
+                className="search-bar" 
+                style={{ 
+                  borderColor: searchFocused ? '#4ade80' : undefined,
+                  transition: 'border-color 0.15s ease'
+                }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-                  <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" />
-                  <circle cx="16" cy="6" r="2" />
-                  <circle cx="10" cy="12" r="2" />
-                  <circle cx="18" cy="18" r="2" />
-                </svg>
-                Filters
-                {anyFilter && <span className="filter-count">{activeFilters}</span>}
-              </button>
+                <span className="search-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                    <circle cx="10.5" cy="10.5" r="7.5" />
+                    <line x1="16" y1="16" x2="22.5" y2="22.5" />
+                  </svg>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search for games..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onFocus={() => {
+                    setShowHistory(true)
+                    setSearchFocused(true)
+                  }}
+                  onBlur={(e) => {
+                    if (!historyRef.current?.contains(e.relatedTarget as Node)) {
+                      setTimeout(() => setShowHistory(false), 200)
+                    }
+                    setSearchFocused(false)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      saveSearch(searchTerm)
+                      setSubmittedSearch(searchTerm.trim())
+                      setSearchTerm('')
+                      setShowHistory(false)
+                      setSearchFocused(false)
+                      e.currentTarget.blur()
+                      document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' })
+                    }
+                  }}
+                  style={{ outline: 'none' }}
+                />
+                <button
+                  className="search-action"
+                  type="button"
+                  onClick={() => setFilterMenuOpen(true)}
+                  aria-label={anyFilter ? `Filters, ${activeFilters} active` : 'Filters'}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                    <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" />
+                    <circle cx="16" cy="6" r="2" />
+                    <circle cx="10" cy="12" r="2" />
+                    <circle cx="18" cy="18" r="2" />
+                  </svg>
+                  Filters
+                  {anyFilter && <span className="filter-count">{activeFilters}</span>}
+                </button>
+              </div>
+
+              {showHistory && searchHistory.length > 0 && (
+                <div
+                  ref={historyRef}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: 'var(--surface)',
+                    border: '1px solid var(--line-strong)',
+                    borderRadius: '8px',
+                    marginTop: '4px',
+                    zIndex: 20,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div style={{ padding: '8px 14px 4px', fontSize: '12px', color: 'var(--text-dim)' }}>
+                    Recent searches
+                  </div>
+                  {searchHistory.map((term) => (
+                    <div
+                      key={term}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 14px',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <button
+                        type="button"
+                        onMouseDown={() => {
+                          setSearchTerm(term)
+                          saveSearch(term)
+                          setShowHistory(false)
+                        }}
+                        style={{
+                          flex: 1,
+                          textAlign: 'left',
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text)',
+                          font: 'inherit',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {term.charAt(0).toUpperCase() + term.slice(1)}
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          removeSearch(term)
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-dim)',
+                          fontSize: '16px',
+                          cursor: 'pointer',
+                          padding: '0 4px',
+                        }}
+                        aria-label={`Remove ${term}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {submittedSearch && (
+                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '14px', color: 'var(--text-dim)' }}>Search:</span>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--line-strong)',
+                      borderRadius: '999px',
+                      padding: '4px 10px',
+                      fontSize: '14px',
+                    }}
+                  >
+                    "{submittedSearch}"
+                    <button
+                      type="button"
+                      onClick={() => setSubmittedSearch('')}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-dim)',
+                        cursor: 'pointer',
+                        fontSize: '16px',
+                        padding: '0 2px',
+                      }}
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -553,7 +688,7 @@ function App() {
             </div>
           </section>
 
-          <section className="limited-free">
+          <section className="limited-free" id="results">
             <h2>Free for a limited time</h2>
             <p>Games that are temporarily free to claim.</p>
 
@@ -571,7 +706,7 @@ function App() {
               </ul>
             ) : (
               <p className="count">
-                {searchTerm.trim() || anyFilter
+                {searchTerm.trim() || submittedSearch || anyFilter
                   ? 'No free offers match your search or filters.'
                   : 'No current free offers. Check back later!'}
               </p>
@@ -587,7 +722,7 @@ function App() {
               </p>
             ) : (
               <p className="count">
-                {searchTerm.trim() || anyFilter
+                {searchTerm.trim() || submittedSearch || anyFilter
                   ? 'No discounted games match your search or filters.'
                   : 'No discounted games available right now.'}
               </p>
@@ -647,7 +782,7 @@ function App() {
                     </p>
                   ) : (
                     <p className="count">
-                      {searchTerm.trim() || genres.length > 0
+                      {searchTerm.trim() || submittedSearch || genres.length > 0
                         ? 'No Free-to-Play games match your search or filters.'
                         : 'No Free-to-Play games available right now.'}
                     </p>
@@ -692,7 +827,6 @@ function App() {
             <button className="modal-close" onClick={() => setSelectedOffer(null)} aria-label="Close">
               ×
             </button>
-            {/* Same images as the cards, keyed so a new game never shows the last one's image. */}
             <div className="card-media modal-media">
               <GameImage key={selectedOffer.id} offer={selectedOffer} />
             </div>

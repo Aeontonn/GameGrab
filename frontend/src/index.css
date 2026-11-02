@@ -769,6 +769,11 @@ main > h2 {
   color: rgba(238, 243, 244, 0.6);
 }
 
+/* Hide the browser's default clear button on search inputs */
+input[type="search"]::-webkit-search-cancel-button {
+  display: none;
+}
+
 /* Opens the filter menu. Lighter than the search field, with a label, so it
    reads as a button and not as part of the field. */
 .search-action {
