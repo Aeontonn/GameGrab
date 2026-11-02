@@ -356,9 +356,13 @@ aside button:disabled {
   padding: 12px;
 }
 
-.offer-card .description {
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+/* The card shows the description's first sentence, the popup the rest, so the
+   sentence is shown whole instead of being cut off with "…". */
+.offer-card .description,
+.modal .description {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: none;
 }
 
 /* On narrow cards the time left drops below the price instead of squeezing it. */
@@ -966,6 +970,37 @@ input[type="search"]::-webkit-search-cancel-button {
   gap: 12px;
 }
 
+/* How many games the chosen filters give, updated as boxes are ticked. */
+.filter-menu-counts {
+  display: flex;
+  margin: 0;
+}
+
+.filter-menu-count {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  padding: 0 40px;
+  text-align: center;
+}
+
+.filter-menu-count + .filter-menu-count {
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.filter-menu-count dd {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.filter-menu-count dt {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
 .filter-clear,
 .filter-results {
   min-height: 42px;
@@ -1054,8 +1089,10 @@ input[type="search"]::-webkit-search-cancel-button {
   border-radius: 12px;
   max-width: 640px;
   width: 100%;
-  max-height: none;
-  overflow: visible;
+  /* Never taller than the screen. If the info doesn't fit, the popup scrolls
+     instead of being cut off at the top and bottom. */
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   position: relative;
 }
 
@@ -1074,8 +1111,11 @@ input[type="search"]::-webkit-search-cancel-button {
   z-index: 1;
 }
 
-/* The game's image at the top of the details window, same shape as on the cards. */
+/* The game's image at the top of the details window. A low banner instead of
+   the cards' shape, which would take half the popup and push the info off screen. */
 .modal-media {
+  aspect-ratio: auto;
+  height: 160px;
   border-radius: 12px 12px 0 0;
 }
 
@@ -1194,6 +1234,25 @@ input[type="search"]::-webkit-search-cancel-button {
 
   .filter-menu-actions {
     padding-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .filter-menu-counts {
+    order: -1;
+    flex-basis: 100%;
+  }
+
+  .filter-menu-count {
+    flex: 1;
+    padding: 0 6px;
+  }
+
+  .filter-menu-count dd {
+    font-size: 18px;
+  }
+
+  .filter-menu-count dt {
+    font-size: 12px;
   }
 
   .offer-actions {
