@@ -129,7 +129,8 @@ header p {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  z-index: 10;
+  /* Above the sticky search band (50), below the game window (100). */
+  z-index: 60;
   width: 280px;
   display: flex;
   flex-direction: column;
@@ -1114,6 +1115,15 @@ main > h2 {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* The login panel spans the screen, minus the page's 16px margin on each side.
+     border-box keeps the padding inside that width. No gap below the button, so
+     the tagline underneath doesn't peek through. */
+  .auth-form {
+    top: 100%;
+    width: calc(100vw - 32px);
+    box-sizing: border-box;
   }
 
   .layout {
