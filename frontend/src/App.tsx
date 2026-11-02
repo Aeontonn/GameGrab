@@ -5,9 +5,14 @@ import { openInApp } from './appLink'
 import { STORES } from './types'
 import type { FreeGame, Offer, OfferDetails } from './types'
 
+// Checks the value if it's unchecked, unchecks it if it's already selected.
 const toggle = (list: string[], value: string) =>
   list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 
+// The text that shows how long the offer lasts, or null if the store doesn't
+// provide an end date. Counts whole days ahead, so "2 days left" means there
+// are at least 2 full days left – and on the last day we say hours, because
+// "0 days left" sounds like it has already ended.
 const timeLeft = (endsAt: string | null): string | null => {
   if (!endsAt) return null
   const msLeft = new Date(endsAt).getTime() - Date.now()
@@ -18,6 +23,8 @@ const timeLeft = (endsAt: string | null): string | null => {
   return days === 1 ? '1 day left' : `${days} days left`
 }
 
+// Exact time left for the cards, e.g. "2 d 4 h left". soon is true for the last
+// 24 hours, so the offers that really are about to end stand out.
 const exactTimeLeft = (endsAt: string | null, now: number): { text: string; soon: boolean } | null => {
   if (!endsAt) return null
   const msLeft = new Date(endsAt).getTime() - now
@@ -38,6 +45,8 @@ const imagesFor = (offer: Offer): string[] => {
   return offer.thumb ? [...steam, offer.thumb] : steam
 }
 
+// The "Ends within 2 days" option shows offers that expire within this many days.
+// With 7 days nearly every offer was included, so the option said nothing.
 const withoutRequirementLabel = (value: string): string =>
   value.replace(/^(Minimum|Recommended):\s*/i, '')
 
@@ -56,6 +65,26 @@ const FILTER_GENRES = [
 ]
 
 const PREFETCH_DELAY_MS = 120
+
+// Builds the list of page numbers to show. Shows a window around the current
+// page, plus the first and last page, with ellipsis in between when needed.
+function getPageNumbers(current: number, total: number): (number | '...')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+
+  const pages: (number | '...')[] = [1]
+
+  if (current > 4) pages.push('...')
+
+  const start = Math.max(2, current - 1)
+  const end = Math.min(total - 1, current + 1)
+
+  for (let i = start; i <= end; i++) pages.push(i)
+
+  if (current < total - 3) pages.push('...')
+
+  pages.push(total)
+  return pages
+}
 
 function GameImage({ offer }: { offer: Offer }) {
   const [candidates] = useState(() => imagesFor(offer))
@@ -348,6 +377,8 @@ function App() {
     (safePage - 1) * ITEMS_PER_PAGE,
     safePage * ITEMS_PER_PAGE,
   )
+
+  const pageNumbers = getPageNumbers(safePage, totalPages)
 
   const visibleFree = useMemo(
     () =>
@@ -649,19 +680,6 @@ function App() {
                     Clear all
                   </button>
 
-                  <dl className="filter-menu-counts" aria-live="polite">
-                    {[
-                      { label: 'Free for a limited time', count: freeOffers.length },
-                      { label: 'Discounted games', count: discountedOffers.length },
-                      { label: 'Free to play', count: visibleFree.length },
-                    ].map(({ label, count }) => (
-                      <div key={label} className="filter-menu-count">
-                        <dt>{label}</dt>
-                        <dd>{count.toLocaleString('sv-SE')}</dd>
-                      </div>
-                    ))}
-                  </dl>
-
                   <div className="filter-menu-actions-right">
                     <button
                       type="button"
@@ -766,9 +784,40 @@ function App() {
               >
                 ← Previous
               </button>
-              <span className="page-indicator">
-                {safePage} / {totalPages}
-              </span>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {pageNumbers.map((page, index) =>
+                  page === '...' ? (
+                    <span key={`ellipsis-${index}`} style={{ color: 'var(--text-dim)', padding: '0 4px' }}>
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => {
+                        setCurrentPage(page)
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                      style={{
+                        minWidth: '36px',
+                        height: '36px',
+                        padding: '0 8px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: page === safePage ? '#4ade80' : 'transparent',
+                        color: page === safePage ? '#062b14' : 'var(--text)',
+                        fontWeight: page === safePage ? 700 : 500,
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={() => {
@@ -825,6 +874,7 @@ function App() {
         </main>
       </div>
 
+      {/* In the corner. Always visible on a wide screen, only after scrolling on mobile. */}
       <button
         type="button"
         className={atTop ? 'to-top-button at-top' : 'to-top-button'}
@@ -836,7 +886,7 @@ function App() {
 
       {selectedOffer && (
         <div className="modal-overlay" onClick={() => setSelectedOffer(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px' }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', overflow: 'visible' }}>
             <button className="modal-close" onClick={() => setSelectedOffer(null)} aria-label="Close">
               ×
             </button>
