@@ -1,11 +1,13 @@
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
+import gzip
+import json
 import os
 import re
 import time
@@ -52,21 +54,35 @@ app.add_middleware(
 # about a fifth of its size, which is what makes the page load fast on mobile.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Answers kept in memory, by endpoint: (time it was saved, the answer).
-_cache: dict[str, tuple[float, list]] = {}
+# Answers kept in memory, by endpoint: (time it was saved, JSON, gzipped JSON).
+# We keep the finished bytes, not the list. Turning 2000+ offers into JSON and
+# compressing it takes most of a second on Render's small free CPU, and doing
+# that on every visit made /offers slow even when the answer was cached.
+_cache: dict[str, tuple[float, bytes, bytes]] = {}
 
 
-def cached(key: str) -> list | None:
+def send(hit: tuple[float, bytes, bytes], request: Request) -> Response:
+    """The saved answer, already compressed if the browser accepts gzip."""
+    _, body, zipped = hit
+    if "gzip" in request.headers.get("accept-encoding", ""):
+        # GZipMiddleware sees Content-Encoding and leaves the answer alone.
+        return Response(zipped, media_type="application/json",
+                        headers={"Content-Encoding": "gzip", "Vary": "Accept-Encoding"})
+    return Response(body, media_type="application/json")
+
+
+def cached(key: str, request: Request) -> Response | None:
     """The saved answer for `key`, or None if there is none or it's too old."""
     hit = _cache.get(key)
     if hit and time.monotonic() - hit[0] < CACHE_SECONDS:
-        return hit[1]
+        return send(hit, request)
     return None
 
 
-def save(key: str, answer: list) -> list:
-    _cache[key] = (time.monotonic(), answer)
-    return answer
+def save(key: str, answer: list, request: Request) -> Response:
+    body = json.dumps(answer, separators=(",", ":")).encode()
+    _cache[key] = hit = (time.monotonic(), body, gzip.compress(body, 6))
+    return send(hit, request)
 
 
 def database_error(exc: SQLAlchemyError) -> JSONResponse:
@@ -83,7 +99,8 @@ def database_error(exc: SQLAlchemyError) -> JSONResponse:
 
 
 # Answers: is the server alive, and can it reach the database?
-@app.get("/health")
+# HEAD too, since uptime monitors often send HEAD and would otherwise get 405.
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health():
     try:
         # SELECT 1 fetches no real data – it only tests that the connection works.
@@ -146,8 +163,8 @@ def limit_series(rows: list, cap: int) -> list:
 # If the fetch is delayed (GitHub often runs it hours late) we keep showing
 # that snapshot instead of an empty page.
 @app.get("/offers")
-def offers():
-    if (answer := cached("offers")) is not None:
+def offers(request: Request):
+    if (answer := cached("offers", request)) is not None:
         return answer
 
     try:
@@ -185,7 +202,7 @@ def offers():
             "ends_at": row["ends_at"].isoformat() if row["ends_at"] else None,
         }
         for row in limit_series(rows, MAX_PER_SERIES)
-    ])
+    ], request)
 
 
 def short_description(description: str | None) -> str | None:
@@ -222,8 +239,8 @@ def offer_details(offer_id: int):
 # fetch_free_games.py once a day. No freshness check like in /offers:
 # a free to play game doesn't stop being free overnight.
 @app.get("/free-games")
-def free_games():
-    if (answer := cached("free-games")) is not None:
+def free_games(request: Request):
+    if (answer := cached("free-games", request)) is not None:
         return answer
 
     try:
@@ -238,4 +255,4 @@ def free_games():
     except SQLAlchemyError as exc:
         return database_error(exc)
 
-    return save("free-games", [dict(row) for row in rows])
+    return save("free-games", [dict(row) for row in rows], request)
