@@ -356,9 +356,13 @@ aside button:disabled {
   padding: 12px;
 }
 
-.offer-card .description {
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+/* The card shows the description's first sentence, the popup the rest, so the
+   sentence is shown whole instead of being cut off with "…". */
+.offer-card .description,
+.modal .description {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: none;
 }
 
 /* On narrow cards the time left drops below the price instead of squeezing it. */
@@ -1054,8 +1058,10 @@ input[type="search"]::-webkit-search-cancel-button {
   border-radius: 12px;
   max-width: 640px;
   width: 100%;
-  max-height: none;
-  overflow: visible;
+  /* Never taller than the screen. If the info doesn't fit, the popup scrolls
+     instead of being cut off at the top and bottom. */
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   position: relative;
 }
 
@@ -1074,8 +1080,11 @@ input[type="search"]::-webkit-search-cancel-button {
   z-index: 1;
 }
 
-/* The game's image at the top of the details window, same shape as on the cards. */
+/* The game's image at the top of the details window. A low banner instead of
+   the cards' shape, which would take half the popup and push the info off screen. */
 .modal-media {
+  aspect-ratio: auto;
+  height: 160px;
   border-radius: 12px 12px 0 0;
 }
 

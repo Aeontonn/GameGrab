@@ -823,7 +823,7 @@ function App() {
 
       {selectedOffer && (
         <div className="modal-overlay" onClick={() => setSelectedOffer(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', overflow: 'visible' }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px' }}>
             <button className="modal-close" onClick={() => setSelectedOffer(null)} aria-label="Close">
               ×
             </button>
