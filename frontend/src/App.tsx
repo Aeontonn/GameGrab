@@ -181,7 +181,7 @@ function OfferCard({
             className="game-reviews"
             style={{ color: 'var(--text-dim)', fontWeight: 600, margin: '4px 0 8px' }}
           >
-            {Math.round(offer.review_positive_percent!)}% positive
+            {Math.round(offer.review_positive_percent!)}%
             {' · '}
             {offer.review_total!.toLocaleString('en-US')} reviews on {offer.review_source}
           </p>
@@ -850,7 +850,7 @@ function App() {
                     {[
                       { label: 'Free for a limited time', count: freeOffers.length },
                       { label: 'Discounted games', count: discountedOffers.length },
-                      { label: 'Free to play', count: visibleFree.length },
+                      { label: 'Free to play', count: freeGamesAsOffers.length },
                     ].map(({ label, count }) => (
                       <div key={label} className="filter-menu-count">
                         <dt>{label}</dt>
