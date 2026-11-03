@@ -445,13 +445,14 @@ function App() {
   const freeGamesAsOffers: Offer[] = freeGames
     .filter(
       (game) =>
+        (stores.length === 0 || stores.includes(game.store)) &&
         (genres.length === 0 || game.genres.some((genre) => genres.includes(genre))) &&
         matchesSearch(game.title),
     )
     .map((game) => ({
       id: game.id,
       title: game.title,
-      store: 'Steam',
+      store: game.store,
       claim_url: game.claim_url,
       thumb: null,
       steam_app_id: game.steam_app_id,
