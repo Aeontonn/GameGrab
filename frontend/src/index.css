@@ -193,6 +193,22 @@ header p {
   font-weight: 700;
 }
 
+/* "Forgot password?": looks like a text link, not a button. */
+.auth-form button.link-button {
+  align-self: flex-start;
+  margin-top: -6px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--text-dim);
+  text-decoration: underline;
+}
+
+.auth-form button.link-button:hover {
+  color: var(--text);
+}
+
 .auth-form button:disabled {
   opacity: 0.6;
   cursor: default;
