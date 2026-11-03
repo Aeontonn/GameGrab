@@ -403,15 +403,32 @@ aside button:disabled {
 }
 
 .offer-card-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 13px;
   color: var(--text-dim);
   white-space: nowrap;
 }
 
-/* Less than a day left. */
-.offer-card-time.soon {
-  color: var(--warn);
+/* 24–48 hours left */
+.offer-card-time.warning {
+  color: #fbbf24;
   font-weight: 700;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+/* Less than 24 hours left */
+.offer-card-time.urgent {
+  color: #fb7185;
+  font-weight: 700;
+  background: rgba(251, 113, 133, 0.12);
+  border: 1px solid rgba(251, 113, 133, 0.35);
+  border-radius: 6px;
+  padding: 5px 8px;
 }
 
 .offers h3 {
