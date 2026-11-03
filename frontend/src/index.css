@@ -109,20 +109,22 @@ header p {
   border-color: var(--text-dim);
 }
 
-/* The only action in the header, so it's a filled button. "Log out" keeps the
-   quiet style above. */
-.account .login-button {
+/* Log in button – always visible and styled */
+.account .login-button,
+.account button {
   padding: 9px 18px;
-  background: var(--text);
-  color: var(--bg);
-  border-color: var(--text);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
-  font-weight: 700;
+  font-weight: 600;
+  font-size: 14px;
 }
 
-.account .login-button:hover {
-  background: #ffffff;
-  border-color: #ffffff;
+.account .login-button:hover,
+.account button:hover {
+  background: var(--line);
+  border-color: var(--text-dim);
 }
 
 .auth-form {
@@ -740,7 +742,7 @@ main > h2 {
   gap: 12px;
 
   width: 100%;
-  max-width: 520px;
+  max-width: none;
   margin: 0;
 
   padding: 8px 8px 8px 14px;

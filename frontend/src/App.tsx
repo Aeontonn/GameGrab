@@ -66,21 +66,34 @@ const FILTER_GENRES = [
 
 const PREFETCH_DELAY_MS = 120
 
-// Builds the list of page numbers to show. Shows a window around the current
-// page, plus the first and last page, with ellipsis in between when needed.
+type Tab = 'all' | 'free' | 'limited' | 'discounted'
+
+const TAB_LABELS: Record<Tab, string> = {
+  all: 'All',
+  free: 'Free',
+  limited: 'Free for a limited time',
+  discounted: 'Discounted',
+}
+
+const TAB_HEADINGS: Record<Tab, string> = {
+  all: 'All games',
+  free: 'Free games',
+  limited: 'Free for a limited time',
+  discounted: 'Discounted games',
+}
+
+// Builds the list of page numbers to show. Shows the first few pages,
+// then ellipsis, then the last page.
 function getPageNumbers(current: number, total: number): (number | '...')[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
 
-  const pages: (number | '...')[] = [1]
+  const pages: (number | '...')[] = [1, 2, 3, 4]
 
-  if (current > 4) pages.push('...')
+  if (current > 5) pages.push('...')
 
-  const start = Math.max(2, current - 1)
-  const end = Math.min(total - 1, current + 1)
+  if (current > 4 && current < total - 1) pages.push(current)
 
-  for (let i = start; i <= end; i++) pages.push(i)
-
-  if (current < total - 3) pages.push('...')
+  if (current < total - 2) pages.push('...')
 
   pages.push(total)
   return pages
@@ -176,7 +189,7 @@ function OfferCard({
 
         <div className="offer-card-foot">
           <p className="offer-card-price">
-            <span className={offer.is_free ? 'now free' : 'now'}>
+            <span className="now" style={{ color: '#4ade80' }}>
               {offer.is_free ? 'Free' : `$${offer.sale_price.toFixed(2)}`}
             </span>
             <s>${offer.normal_price.toFixed(2)}</s>
@@ -225,6 +238,10 @@ function App() {
   const [showHistory, setShowHistory] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
   const historyRef = useRef<HTMLDivElement>(null)
+  const [activeTab, setActiveTab] = useState<Tab>('all')
+  const [searchChipLeft, setSearchChipLeft] = useState(0)
+  const mainRef = useRef<HTMLElement>(null)
+  const searchWrapperRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const saved = localStorage.getItem('gamegrab-search-history')
@@ -316,7 +333,7 @@ function App() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [stores, genres, endingWithinDays, searchTerm, submittedSearch])
+  }, [stores, genres, endingWithinDays, searchTerm, submittedSearch, activeTab])
 
   useEffect(() => {
     const html = document.documentElement
@@ -333,6 +350,31 @@ function App() {
 
   useEffect(() => {
     document.documentElement.style.scrollbarGutter = 'stable'
+  }, [])
+
+  // Keep the search chip aligned below the search field, while letting it scroll
+  // with the page instead of making it part of the sticky search bar.
+  useEffect(() => {
+    const updateSearchChipPosition = () => {
+      const main = mainRef.current
+      const search = searchWrapperRef.current
+      if (!main || !search) return
+      setSearchChipLeft(Math.max(
+        0,
+        search.getBoundingClientRect().left - main.getBoundingClientRect().left,
+      ))
+    }
+
+    updateSearchChipPosition()
+    window.addEventListener('resize', updateSearchChipPosition)
+    const observer = new ResizeObserver(updateSearchChipPosition)
+    if (mainRef.current) observer.observe(mainRef.current)
+    if (searchWrapperRef.current) observer.observe(searchWrapperRef.current)
+
+    return () => {
+      window.removeEventListener('resize', updateSearchChipPosition)
+      observer.disconnect()
+    }
   }, [])
 
   const freeGames = useMemo(
@@ -366,29 +408,73 @@ function App() {
   const freeOffers = visible.filter((offer) => offer.is_free)
   const discountedOffers = visible.filter((offer) => !offer.is_free)
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(discountedOffers.length / ITEMS_PER_PAGE),
-  )
+  // Combine free games (always free) with limited-time free offers for the "Free" tab
+  const freeGamesAsOffers: Offer[] = freeGames
+    .filter(
+      (game) =>
+        (genres.length === 0 || game.genres.some((genre) => genres.includes(genre))) &&
+        matchesSearch(game.title),
+    )
+    .map((game) => ({
+      id: game.id,
+      title: game.title,
+      store: 'Steam',
+      claim_url: game.claim_url,
+      thumb: null,
+      steam_app_id: game.steam_app_id,
+      genres: game.genres,
+      description: null,
+      short_description: null,
+      normal_price: 0,
+      sale_price: 0,
+      savings: 100,
+      is_free: true,
+      ends_at: null,
+      review_positive_percent: null,
+      review_total: null,
+      review_source: null,
+      launcher_notice: null,
+    }))
 
+  const tabOffers = useMemo(() => {
+    let offers: Offer[]
+
+    switch (activeTab) {
+      case 'all':
+        offers = [...freeGamesAsOffers, ...freeOffers, ...discountedOffers]
+        break
+      case 'free':
+        offers = [...freeGamesAsOffers, ...freeOffers]
+        break
+      case 'limited':
+        offers = [...freeOffers]
+        break
+      case 'discounted':
+        offers = [...discountedOffers]
+        break
+      default:
+        offers = []
+    }
+
+    // Put titles that start with the search term before titles that only contain it.
+    // Keep the existing order within each group.
+    const term = (submittedSearch || searchTerm).trim().toLowerCase()
+    if (!term) return offers
+
+    return offers.sort((a, b) => {
+      const aStartsWith = a.title.toLowerCase().startsWith(term)
+      const bStartsWith = b.title.toLowerCase().startsWith(term)
+      return Number(bStartsWith) - Number(aStartsWith)
+    })
+  }, [activeTab, freeOffers, discountedOffers, freeGamesAsOffers, submittedSearch, searchTerm])
+
+  const totalPages = Math.max(1, Math.ceil(tabOffers.length / ITEMS_PER_PAGE))
   const safePage = Math.min(currentPage, totalPages)
-
-  const paginatedOffers = discountedOffers.slice(
+  const paginatedOffers = tabOffers.slice(
     (safePage - 1) * ITEMS_PER_PAGE,
     safePage * ITEMS_PER_PAGE,
   )
-
   const pageNumbers = getPageNumbers(safePage, totalPages)
-
-  const visibleFree = useMemo(
-    () =>
-      freeGames.filter(
-        (game) =>
-          (genres.length === 0 || game.genres.some((genre) => genres.includes(genre))) &&
-          matchesSearch(game.title),
-      ),
-    [freeGames, genres, matchesSearch],
-  )
 
   const activeFilters = stores.length + genres.length + (endingWithinDays !== null ? 1 : 0)
   const anyFilter = activeFilters > 0
@@ -426,71 +512,110 @@ function App() {
     <>
       <header>
         <div>
-          <h1>Game<span style={{ color: '#4ade80' }}>Grab</span></h1>
+          <h1 style={{ fontWeight: 900, letterSpacing: '-0.03em', fontSize: '42px' }}>
+            Game<span style={{ color: '#4ade80' }}>Grab</span>
+          </h1>
           <p>Free and discounted PC games, all in one place.</p>
         </div>
         <Account />
       </header>
 
       <div className="layout">
-        <main>
-          <div className="search-sticky">
-            <div className="search-wrapper" style={{ position: 'relative' }}>
-              <div 
-                className="search-bar" 
-                style={{ 
-                  borderColor: searchFocused ? '#4ade80' : undefined,
-                  transition: 'border-color 0.15s ease'
+        <main ref={mainRef}>
+          {/* Search bar + tabs stick together */}
+          <div
+            className="search-sticky"
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
+              background: 'var(--bg)',
+              paddingBottom: '12px',
+            }}
+          >
+            <div
+              ref={searchWrapperRef}
+              className="search-wrapper"
+              style={{
+                position: 'relative',
+                width: '100%',
+                boxSizing: 'border-box',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
                 }}
               >
-                <span className="search-icon">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <circle cx="10.5" cy="10.5" r="7.5" />
-                    <line x1="16" y1="16" x2="22.5" y2="22.5" />
-                  </svg>
-                </span>
-                <input
-                  type="text"
-                  placeholder="Search for games..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onFocus={() => {
-                    setShowHistory(true)
-                    setSearchFocused(true)
+                <div
+                  className="search-bar"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    boxSizing: 'border-box',
+                    borderColor: searchFocused ? '#4ade80' : undefined,
+                    transition: 'border-color 0.15s ease',
+                    display: 'flex',
+                    alignItems: 'center',
                   }}
-                  onBlur={(e) => {
-                    if (!historyRef.current?.contains(e.relatedTarget as Node)) {
-                      setTimeout(() => setShowHistory(false), 200)
-                    }
-                    setSearchFocused(false)
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      saveSearch(searchTerm)
-                      setSubmittedSearch(searchTerm.trim())
-                      setSearchTerm('')
-                      setShowHistory(false)
+                >
+                  <span className="search-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                      <circle cx="10.5" cy="10.5" r="7.5" />
+                      <line x1="16" y1="16" x2="22.5" y2="22.5" />
+                    </svg>
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search games..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onFocus={() => {
+                      setShowHistory(true)
+                      setSearchFocused(true)
+                    }}
+                    onBlur={(e) => {
+                      if (!historyRef.current?.contains(e.relatedTarget as Node)) {
+                        setTimeout(() => setShowHistory(false), 200)
+                      }
                       setSearchFocused(false)
-                      e.currentTarget.blur()
-                      document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' })
-                    }
-                  }}
-                  style={{ outline: 'none' }}
-                />
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && searchTerm.trim()) {
+                        saveSearch(searchTerm)
+                        setSubmittedSearch(searchTerm.trim())
+                        setSearchTerm('')
+                        setShowHistory(false)
+                        setSearchFocused(false)
+                        e.currentTarget.blur()
+                        document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' })
+                      }
+                    }}
+                    style={{ outline: 'none', flex: 1, minWidth: 0 }}
+                  />
+                </div>
+
                 <button
-                  className="search-action"
                   type="button"
                   onClick={() => setFilterMenuOpen(true)}
                   aria-label={anyFilter ? `Filters, ${activeFilters} active` : 'Filters'}
+                  style={{
+                    flexShrink: 0,
+                    padding: '12px 20px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--line-strong)',
+                    background: 'var(--surface)',
+                    color: 'var(--text)',
+                    cursor: 'pointer',
+                    fontSize: '15px',
+                    fontWeight: 500,
+                  }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-                    <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" />
-                    <circle cx="16" cy="6" r="2" />
-                    <circle cx="10" cy="12" r="2" />
-                    <circle cx="18" cy="18" r="2" />
-                  </svg>
                   Filters
-                  {anyFilter && <span className="filter-count">{activeFilters}</span>}
+                  {anyFilter && <span className="filter-count"> {activeFilters}</span>}
                 </button>
               </div>
 
@@ -508,9 +633,11 @@ function App() {
                     marginTop: '4px',
                     zIndex: 20,
                     overflow: 'hidden',
+                    width: '100%',
+                    boxSizing: 'border-box',
                   }}
                 >
-                  <div style={{ padding: '8px 14px 4px', fontSize: '12px', color: 'var(--text-dim)' }}>
+                  <div style={{ padding: '8px 14px 4px', fontSize: '11px', color: 'var(--text-dim)' }}>
                     Recent searches
                   </div>
                   {searchHistory.map((term) => (
@@ -520,7 +647,7 @@ function App() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        padding: '10px 14px',
+                        padding: '8px 14px',
                         cursor: 'pointer',
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg)')}
@@ -529,7 +656,8 @@ function App() {
                       <button
                         type="button"
                         onMouseDown={() => {
-                          setSearchTerm(term)
+                          setSubmittedSearch(term.trim())
+                          setSearchTerm('')
                           saveSearch(term)
                           setShowHistory(false)
                         }}
@@ -540,6 +668,7 @@ function App() {
                           border: 'none',
                           color: 'var(--text)',
                           font: 'inherit',
+                          fontSize: '13px',
                           cursor: 'pointer',
                         }}
                       >
@@ -556,9 +685,10 @@ function App() {
                           background: 'transparent',
                           border: 'none',
                           color: 'var(--text-dim)',
-                          fontSize: '16px',
+                          fontSize: '20px',
+                          lineHeight: 1,
                           cursor: 'pointer',
-                          padding: '0 4px',
+                          padding: '2px 7px',
                         }}
                         aria-label={`Remove ${term}`}
                       >
@@ -568,43 +698,79 @@ function App() {
                   ))}
                 </div>
               )}
+            </div>
 
-              {submittedSearch && (
-                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '14px', color: 'var(--text-dim)' }}>Search:</span>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      background: 'var(--surface)',
-                      border: '1px solid var(--line-strong)',
-                      borderRadius: '999px',
-                      padding: '4px 10px',
-                      fontSize: '14px',
-                    }}
-                  >
-                    "{submittedSearch}"
-                    <button
-                      type="button"
-                      onClick={() => setSubmittedSearch('')}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--text-dim)',
-                        cursor: 'pointer',
-                        fontSize: '16px',
-                        padding: '0 2px',
-                      }}
-                      aria-label="Clear search"
-                    >
-                      ×
-                    </button>
-                  </span>
-                </div>
-              )}
+            {/* Tab buttons now inside the sticky container */}
+            <div style={{ display: 'flex', gap: '8px', width: '100%', margin: '8px 0 0' }}>
+              {(Object.keys(TAB_LABELS) as Tab[]).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  style={{
+                    flex: 1,
+                    padding: '14px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--line-strong)',
+                    background: activeTab === tab ? '#4ade80' : 'var(--surface)',
+                    color: activeTab === tab ? '#062b14' : 'var(--text)',
+                    fontWeight: activeTab === tab ? 700 : 500,
+                    fontSize: '15px',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {TAB_LABELS[tab]}
+                </button>
+              ))}
             </div>
           </div>
+
+          {submittedSearch && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                margin: `0 0 16px ${searchChipLeft}px`,
+              }}
+            >
+              <span style={{ fontSize: '16px', color: 'var(--text-dim)' }}>Search:</span>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--line-strong)',
+                  borderRadius: '999px',
+                  padding: '6px 12px',
+                  fontSize: '16px',
+                }}
+              >
+                "{submittedSearch.charAt(0).toUpperCase() + submittedSearch.slice(1)}"
+                <button
+                  type="button"
+                  onClick={() => setSubmittedSearch('')}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-dim)',
+                    cursor: 'pointer',
+                    fontSize: '21px',
+                    lineHeight: 1,
+                    padding: '0 3px',
+                  }}
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              </span>
+            </div>
+          )}
 
           {filterMenuOpen && (
             <div className="filter-overlay">
@@ -694,40 +860,17 @@ function App() {
             </div>
           )}
 
-          <section className="free-to-play-preview">
-            <div className="free-to-play-preview-content">
-              <div>
-                <h2>Free-to-Play games</h2>
-                <p>
-                  Discover games that are always free to play,
-                  not just temporarily free.
-                </p>
-              </div>
+          <section id="results" style={{ overflowAnchor: 'none' }}>
+            <h2 style={{ marginTop: '8px' }}>{TAB_HEADINGS[activeTab]}</h2>
+            <p className="count">
+              <strong>{tabOffers.length}</strong> games found
+            </p>
 
-              <button
-                type="button"
-                className="free-to-play-button"
-                onClick={() =>
-                  document
-                    .getElementById('always-free')
-                    ?.scrollIntoView({ behavior: 'smooth' })
-                }
-              >
-                <span>Explore Free-to-Play</span>
-                <span className="free-to-play-arrow" aria-hidden="true">↓</span>
-              </button>
-            </div>
-          </section>
-
-          <section className="limited-free" id="results">
-            <h2>Free for a limited time</h2>
-            <p>Games that are temporarily free to claim.</p>
-
-            {freeOffers.length > 0 ? (
+            {tabOffers.length > 0 ? (
               <ul className="offers">
-                {freeOffers.map((offer) => (
+                {paginatedOffers.map((offer) => (
                   <OfferCard
-                    key={offer.id}
+                    key={`${offer.id}-${offer.store}`}
                     offer={offer}
                     now={now}
                     onClick={() => setSelectedOffer(offer)}
@@ -736,40 +879,8 @@ function App() {
                 ))}
               </ul>
             ) : (
-              <p className="count">
-                {searchTerm.trim() || submittedSearch || anyFilter
-                  ? 'No free offers match your search or filters.'
-                  : 'No current free offers. Check back later!'}
-              </p>
+              <p className="count">No games match your search or filters.</p>
             )}
-          </section>
-
-          <section className="discounted-games">
-            <h2>Discounted games</h2>
-
-            {discountedOffers.length > 0 ? (
-              <p className="count">
-                <strong>{discountedOffers.length}</strong> discounted games
-              </p>
-            ) : (
-              <p className="count">
-                {searchTerm.trim() || submittedSearch || anyFilter
-                  ? 'No discounted games match your search or filters.'
-                  : 'No discounted games available right now.'}
-              </p>
-            )}
-
-            <ul className="offers">
-              {paginatedOffers.map((offer) => (
-                <OfferCard
-                  key={offer.id}
-                  offer={offer}
-                  now={now}
-                  onClick={() => setSelectedOffer(offer)}
-                  onPrefetch={() => loadDetails(offer.id)}
-                />
-              ))}
-            </ul>
           </section>
 
           {totalPages > 1 && (
@@ -829,47 +940,6 @@ function App() {
                 Next →
               </button>
             </div>
-          )}
-
-          {freeLoad.state !== 'loading' && (
-            <section className="always-free" id="always-free">
-              <h2>Popular free games</h2>
-              {freeLoad.state === 'error' ? (
-                <p className="error">Couldn't fetch the list of free games.</p>
-              ) : (
-                <>
-                  {visibleFree.length > 0 ? (
-                    <p className="count">
-                      <strong>{visibleFree.length}</strong> free to play games
-                    </p>
-                  ) : (
-                    <p className="count">
-                      {searchTerm.trim() || submittedSearch || genres.length > 0
-                        ? 'No Free-to-Play games match your search or filters.'
-                        : 'No Free-to-Play games available right now.'}
-                    </p>
-                  )}
-
-                  <ul className="free-games">
-                    {visibleFree.map((game) => (
-                      <li key={game.id}>
-                        <a
-                          href={game.claim_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(event) => openInApp(event, game.store, game.steam_app_id, game.claim_url)}
-                        >
-                          {game.title}
-                        </a>
-                        {game.genres.length > 0 && (
-                          <span className="genres">{game.genres.slice(0, 3).join(' · ')}</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-            </section>
           )}
         </main>
       </div>
@@ -976,12 +1046,12 @@ function App() {
                     {selectedOffer.is_free ? (
                       <>
                         <s>${selectedOffer.normal_price.toFixed(2)}</s>{' '}
-                        <strong style={{ color: 'var(--ok)' }}>Free right now</strong>
+                        <strong style={{ color: '#4ade80' }}>Free right now</strong>
                       </>
                     ) : (
                       <>
                         <s>${selectedOffer.normal_price.toFixed(2)}</s>{' '}
-                        <span style={{ color: 'var(--ok)' }}>${selectedOffer.sale_price.toFixed(2)}</span>
+                        <span style={{ color: '#4ade80' }}>${selectedOffer.sale_price.toFixed(2)}</span>
                       </>
                     )}{' '}
                     <span className="savings">−{Math.round(selectedOffer.savings)}%</span>
