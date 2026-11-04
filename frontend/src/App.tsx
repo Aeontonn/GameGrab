@@ -196,6 +196,7 @@ function OfferCard({
   <h3>{offer.title}</h3>
   <button
     type="button"
+    disabled={watchBusy}
     title={watched ? 'Sluta bevaka' : 'Watch game'}
     aria-label={watched ? `Sluta bevaka ${offer.title}` : `Bevaka ${offer.title}`}
 
