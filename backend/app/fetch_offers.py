@@ -36,7 +36,7 @@ API = "https://www.cheapshark.com/api/1.0/deals"
 # CheapShark requires requests to say which app is asking, otherwise they refuse.
 USER_AGENT = "GameGrab/0.1 (student project)"
 
-# The three PC stores we care about. The keys are CheapShark's own ids,
+# The four PC stores we care about. The keys are CheapShark's own ids,
 # the values are the names we want to show in the frontend.
 STORES = {
     "1": "Steam",
@@ -557,24 +557,26 @@ def fetch_page(**params) -> list[dict]:
             with urlopen(request, timeout=30) as response:
                 return json.load(response)
         except HTTPError as error:
-                if error.code not in (400, 429, 500, 502, 503) or attempt == 4:
-                    print(f"CheapShark request failed: {url}", flush=True)
-                    print(f"HTTP status: {error.code}", flush=True)
-                    raise
+            # 400 is not retried: CheapShark answers it for a page past the end
+            # of the list, and collect() handles that by starting over.
+            if error.code not in (429, 500, 502, 503) or attempt == 4:
+                print(f"CheapShark request failed: {url}", flush=True)
+                print(f"HTTP status: {error.code}", flush=True)
+                raise
 
             # When blocked, CheapShark says how long in Retry-After (seconds).
             # A short wait is worth sitting out; a long one (it can be nearly
             # an hour) is not – better to stop now and let the next run try.
-                retry_after = error.headers.get("Retry-After")
-                if retry_after and retry_after.isdigit():
-                    if int(retry_after) > MAX_WAIT:
-                        raise RuntimeError(
-                            f"CheapShark has blocked us for {retry_after} seconds "
-                            "(rate limit). Nothing was changed; try again later."
-                        ) from error
-                    time.sleep(int(retry_after) + 1)
-                else:
-                    time.sleep(10 * 2**attempt)
+            retry_after = error.headers.get("Retry-After")
+            if retry_after and retry_after.isdigit():
+                if int(retry_after) > MAX_WAIT:
+                    raise RuntimeError(
+                        f"CheapShark has blocked us for {retry_after} seconds "
+                        "(rate limit). Nothing was changed; try again later."
+                    ) from error
+                time.sleep(int(retry_after) + 1)
+            else:
+                time.sleep(10 * 2**attempt)
 
 
 # CheapShark allows at most 60 deals per page.
@@ -759,8 +761,8 @@ UPSERT = text("""
         -- (Steam or GOG didn't respond) we keep the genres we already have.
         genres       = CASE WHEN EXCLUDED.genres = '{}' THEN offers.genres
                             ELSE EXCLUDED.genres END,
-        -- Same for the end date: if the lookup fails we keep what we have.
-        -- A date that has already passed is hidden by /offers anyway.
+        -- Same for the texts and the end date: if the lookup fails we keep
+        -- what we have. An end date that has passed is hidden by /offers anyway.
         description = COALESCE(EXCLUDED.description, offers.description),
         minimum_requirements = COALESCE(
             EXCLUDED.minimum_requirements,

@@ -22,8 +22,12 @@ Adult games, DLC, bundles and special editions are filtered out.
 - **Steam review scores** on the cards, also for games sold on GOG or Epic.
 - **Pagination**, 40 games per page.
 - **Accounts:** sign up, log in, log out and reset a forgotten password.
-- **Watchlist:** logged-in users can watch games with the bell icon and see them
-  under "My watchlist".
+- **Watchlist:** logged-in users can watch offers with the bell icon and see them
+  under "My watchlist". Free-to-play games can't be watched, since they never
+  stop being free.
+- **Browser notifications:** after turning them on in the watchlist, the site
+  shows a notification when a watched offer becomes free. It checks every
+  5 minutes while the page is open.
 - **Mobile:** on a phone, Steam links open in the Steam app if it's installed.
 
 ## Tech stack
@@ -207,6 +211,7 @@ need it.
 | `GET /offers` | All current offers, with what the cards need |
 | `GET /offers/{id}` | Full description and system requirements for one offer, fetched when its details window opens |
 | `GET /free-games` | Free-to-play games, most played first |
+| `GET /free-games/{id}` | Description and system requirements for one free-to-play game |
 
 If the database can't be reached, every endpoint answers `503` with
 `"database": "disconnected"`, so the frontend shows an error instead of an empty
@@ -254,12 +259,14 @@ A healthy `/health` answers:
 
 `backend/app/fetch_free_games.py` runs once a day. It searches Steam for games
 tagged Free to Play, confirms each one with Steam (a real game that is always
-free and not adult), and saves the 150 most played in `free_games`.
-Counter-Strike 2 is always included, and a few games outside Steam
-(League of Legends, VALORANT, Hearthstone and others) are added by hand.
+free and not adult), and saves the 150 most played in `free_games`, with image,
+description and system requirements from Steam. Counter-Strike 2 is always
+included, and a few games outside Steam (League of Legends, VALORANT,
+Hearthstone and others) are added by hand in the script, with their own
+descriptions and requirements.
 
-They show up in the All and Free tabs. The store and genre filters apply to
-them too.
+They show up in the All and Free tabs, without a price or countdown. The store
+and genre filters apply to them too.
 
 ## Accounts and watchlist
 
@@ -268,10 +275,16 @@ frontend (`frontend/src/supabase.ts` and `frontend/src/Account.tsx`). Visitors
 can sign up, confirm their email, log in, log out and reset a forgotten
 password. Everything except the watchlist works without an account.
 
-The watchlist is stored in the Supabase table `watched_games`
-(`user_id`, `offer_id`, `title`, unique on `user_id` + `offer_id`). The frontend
-reads and writes it with the publishable key, so the table must have Row Level
-Security policies that only let a user see and change their own rows.
+The watchlist is stored in the table `watched_games` (`user_id`, `offer_id`,
+`title`, unique on `user_id` + `offer_id`). The frontend reads and writes it
+directly with the publishable key, so `backend/schema.sql` gives it Row Level
+Security policies that only let a logged-in user see and change their own rows.
+The title is saved too, so the watchlist can still show a game after its offer
+has ended.
+
+Notifications are browser notifications, not push: they only arrive while
+GameGrab is open in a tab. The site remembers in the browser whether each
+watched offer was free last time, and notifies when that changes to free.
 
 The other tables (`offers`, `free_games`, `skipped_deals`, `fetch_state`) have
 Row Level Security turned on with no policies (see `backend/schema.sql`), so the
