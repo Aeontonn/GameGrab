@@ -4,6 +4,7 @@ import { API_URL, fetchFreeGames, fetchOfferDetails, fetchOffers } from './api'
 import { openInApp } from './appLink'
 import { STORES } from './types'
 import type { FreeGame, Offer, OfferDetails } from './types'
+import { supabase } from './supabase'
 
 // Checks the value if it's unchecked, unchecks it if it's already selected.
 const toggle = (list: string[], value: string) =>
@@ -146,12 +147,20 @@ function OfferCard({
   now,
   onClick,
   onPrefetch,
+  watched,
+  onToggleWatch,
+  watchBusy,
+
 }: {
   offer: Offer
   now: number
   onClick: () => void
   onPrefetch: () => void
+  watched: boolean
+  onToggleWatch: () => void
+  watchBusy: boolean
 }) {
+
   const prefetchTimer = useRef<number | undefined>(undefined)
 
   const startPrefetch = () => {
@@ -181,7 +190,50 @@ function OfferCard({
       <CardImage offer={offer} />
 
       <div className="offer-card-body">
-        <h3>{offer.title}</h3>
+
+        
+<div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+  <h3>{offer.title}</h3>
+  <button
+    type="button"
+    title={watched ? 'Sluta bevaka' : 'Watch game'}
+    aria-label={watched ? `Sluta bevaka ${offer.title}` : `Bevaka ${offer.title}`}
+
+onClick={(e) => {
+  e.stopPropagation()
+  onToggleWatch()
+}}
+
+
+    style={{
+      background: 'transparent',
+      border: 'none',
+      color: watched ? '#4ade80' : '#85899a',
+      padding: '4px',
+      cursor: 'pointer',
+      opacity: 0.75,
+      flexShrink: 0,
+      display: 'flex',
+      alignItems: 'center',
+    }}
+  >
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+      <path d="M10 21h4" />
+    </svg>
+  </button>
+</div>
+
         {offer.launcher_notice && (
           <p className="launcher-warning">⚠ Also requires: {offer.launcher_notice}</p>
         )}
@@ -247,7 +299,11 @@ type FreeLoad =
   | { state: 'ok'; games: FreeGame[] }
   | { state: 'error' }
 
-function App() {
+function App() {  
+  const [watchedIds, setWatchedIds] = useState<number[]>([])
+  const [watchedGames, setWatchedGames] = useState<{ offer_id: number; title: string }[]>([])
+  const [watchBusyIds, setWatchBusyIds] = useState<number[]>([])
+  const [showWatched, setShowWatched] = useState(false)
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [freeLoad, setFreeLoad] = useState<FreeLoad>({ state: 'loading' })
   const [openedAt] = useState(() => Date.now())
@@ -280,6 +336,115 @@ function App() {
     const saved = localStorage.getItem('gamegrab-search-history')
     if (saved) setSearchHistory(JSON.parse(saved))
   }, [])
+  
+  useEffect(() => {
+    if (!supabase) return
+
+    const client = supabase
+    let active = true
+
+    const loadWatched = async () => {
+      const { data: { user } } = await client.auth.getUser()
+      if (!active) return
+
+      if (!user) {
+        setWatchedIds([])
+        return
+      }
+
+      const { data, error } = await client
+        .from('watched_games')
+        
+        .select('offer_id, title')
+
+        .eq('user_id', user.id)
+
+      if (!active) return
+
+      if (error) {
+        console.error('Could not load watched games:', error)
+        return
+      }
+
+      setWatchedIds((data ?? []).map((row) => row.offer_id))
+      setWatchedGames(data ?? [])
+    }
+
+    void loadWatched()
+
+    const { data: authListener } = client.auth.onAuthStateChange(() => {
+      void loadWatched()
+    })
+
+    return () => {
+      active = false
+      authListener.subscription.unsubscribe()
+    }
+  }, [])
+
+  
+  const toggleWatch = async (offer: Offer) => {
+    if (!supabase || watchBusyIds.includes(offer.id)) return
+
+    const { data: { user }, error: authError } =
+      await supabase.auth.getUser()
+
+    if (authError || !user) {
+      alert('Log in to watch games')
+      return
+    }
+
+    const isWatched = watchedIds.includes(offer.id)
+
+    setWatchBusyIds((current) => [...current, offer.id])
+
+    try {
+      const { error } = isWatched
+        ? await supabase
+            .from('watched_games')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('offer_id', offer.id)
+        : await supabase
+            .from('watched_games')
+            .upsert(
+              {
+                user_id: user.id,
+                offer_id: offer.id,
+                title: offer.title,
+              },
+              { onConflict: 'user_id,offer_id' }
+            )
+
+      if (error) throw error
+
+      setWatchedIds((current) =>
+        isWatched
+          ? current.filter((id) => id !== offer.id)
+          : [...new Set([...current, offer.id])]
+      )
+      
+setWatchedGames((current) =>
+  isWatched
+    ? current.filter((game) => game.offer_id !== offer.id)
+    : [
+        ...current.filter((game) => game.offer_id !== offer.id),
+        { offer_id: offer.id, title: offer.title },
+      ]
+)
+
+    } catch (error) {
+      alert(
+        'Could not update watchlist: ' +
+        (error instanceof Error ? error.message : 'Unknown error')
+      )
+    } finally {
+      setWatchBusyIds((current) =>
+        current.filter((id) => id !== offer.id)
+      )
+    }
+  }
+
 
   const saveSearch = (term: string) => {
     const trimmed = term.trim()
@@ -551,8 +716,125 @@ function App() {
           </h1>
           <p>Free and discounted PC games, all in one place.</p>
         </div>
-        <Account />
+       
+<div style={{
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  gap: '12px',
+}}>
+  <button
+    type="button"
+    onClick={() => setShowWatched(!showWatched)}
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '8px',
+      background: 'var(--surface)',
+      color: 'var(--text)',
+      border: '1px solid var(--line-strong)',
+      borderRadius: '8px',
+      padding: '10px 14px',
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
+    }}
+  >
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#85899a"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+      <path d="M10 21h4" />
+    </svg>
+     My watchlist ({watchedIds.length})
+  </button>
+
+  <Account />
+</div>
+
+
       </header>
+      
+{showWatched && (
+  <section
+    style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--line-strong)',
+      borderRadius: '10px',
+      padding: '20px',
+      margin: '16px auto',
+      maxWidth: '900px',
+    }}
+  >
+    <h2>My watchlist</h2>
+
+    {watchedIds.length === 0 ? (
+      <p>You're not watching any games yet.</p>
+    ) : (
+     
+<div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+  {watchedGames.map((game) => (
+    <div
+      key={game.offer_id}
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '10px 12px',
+        background: 'var(--bg)',
+        borderRadius: '8px',
+      }}
+    >
+      <span>{game.title}</span>
+
+
+<button
+  type="button"
+  title={`Stop watching${game.title}`}
+  aria-label={`Sluta bevaka ${game.title}`}
+  disabled={watchBusyIds.includes(game.offer_id)}
+  onClick={() => toggleWatch({
+    id: game.offer_id,
+    title: game.title,
+  } as Offer)}
+  style={{
+    color: '#4ade80',
+    display: 'inline-flex',
+    background: 'transparent',
+    border: 'none',
+    padding: '4px',
+    cursor: 'pointer',
+  }}
+>
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+    <path d="M10 21h4" />
+  </svg>
+</button>
+    </div>
+  ))}
+</div>
+
+    )}
+  </section>
+)}
 
       <div className="layout">
         <main ref={mainRef}>
@@ -921,8 +1203,13 @@ function App() {
                     offer={offer}
                     now={now}
                     onClick={() => setSelectedOffer(offer)}
-                    onPrefetch={() => loadDetails(offer.id)}
-                  />
+                    
+onPrefetch={() => loadDetails(offer.id)}
+watched={watchedIds.includes(offer.id)}
+onToggleWatch={() => toggleWatch(offer)}
+watchBusy={watchBusyIds.includes(offer.id)}
+/>
+
                 ))}
               </ul>
             ) : (
