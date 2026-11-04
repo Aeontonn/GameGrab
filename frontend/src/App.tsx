@@ -475,7 +475,8 @@ function App() {
 
     switch (activeTab) {
       case 'all':
-        offers = [...freeGamesAsOffers, ...freeOffers, ...discountedOffers]
+        // Limited-time free offers first, since they disappear soonest.
+        offers = [...freeOffers, ...freeGamesAsOffers, ...discountedOffers]
         break
       case 'free':
         offers = [...freeGamesAsOffers, ...freeOffers]
