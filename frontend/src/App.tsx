@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Account from './Account'
-import { API_URL, fetchFreeGames, fetchOfferDetails, fetchOffers } from './api'
+import {
+  API_URL,
+  fetchFreeGames,
+  fetchFreeGameDetails,
+  fetchOfferDetails,
+  fetchOffers,
+} from './api'
 import { openInApp } from './appLink'
 import { STORES } from './types'
 import type { FreeGame, Offer, OfferDetails } from './types'
@@ -168,7 +174,8 @@ function OfferCard({
     offer.review_total > 0 &&
     offer.review_source
 
-  const left = exactTimeLeft(offer.ends_at, now)
+  const isAlwaysFree = offer.is_free && offer.normal_price === 0
+  const left = isAlwaysFree ? null : exactTimeLeft(offer.ends_at, now)
 
   return (
     <li
@@ -191,7 +198,17 @@ function OfferCard({
           </p>
         )}
         {offer.short_description && (
-          <p className="description">{offer.short_description}</p>
+          <p
+            className="description"
+            style={{
+              display: '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: 3,
+              overflow: 'hidden',
+            }}
+          >
+            {offer.short_description}
+          </p>
         )}
         {hasReviews && (
           <p
@@ -209,28 +226,35 @@ function OfferCard({
             <span className="now" style={{ color: '#4ade80' }}>
               {offer.is_free ? 'Free' : `$${offer.sale_price.toFixed(2)}`}
             </span>
-            <s>${offer.normal_price.toFixed(2)}</s>
-            <span className="savings">−{Math.round(offer.savings)}%</span>
+
+            {!isAlwaysFree && (
+              <>
+                <s>${offer.normal_price.toFixed(2)}</s>
+                <span className="savings">−{Math.round(offer.savings)}%</span>
+              </>
+            )}
           </p>
-            <span className={`offer-card-time ${left?.urgency ?? 'normal'}`}>
-              {left && left.urgency !== 'normal' && (
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M12 7v5l3 2" />
-                </svg>
-              )}
-              {left ? left.text : 'End date unknown'}
-          </span>
+            {!isAlwaysFree && (
+              <span className={`offer-card-time ${left?.urgency ?? 'normal'}`}>
+                {left && left.urgency !== 'normal' && (
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 2" />
+                  </svg>
+                )}
+                {left ? left.text : 'End date unknown'}
+              </span>
+            )}
         </div>
       </div>
     </li>
@@ -262,8 +286,8 @@ function App() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null)
   const [details, setDetails] = useState<OfferDetails | 'loading' | 'error'>('loading')
-  const detailsCache = useRef(new Map<number, OfferDetails>())
-  const detailsRequests = useRef(new Map<number, Promise<OfferDetails>>())
+  const detailsCache = useRef(new Map<string, OfferDetails>())
+  const detailsRequests = useRef(new Map<string, Promise<OfferDetails>>())
   const [slowStart, setSlowStart] = useState(false)
   const [requirementsOpen, setRequirementsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -324,27 +348,43 @@ function App() {
       .catch(() => setFreeLoad({ state: 'error' }))
   }, [])
 
-  const loadDetails = useCallback((id: number): Promise<OfferDetails> => {
-    const saved = detailsCache.current.get(id)
+  const loadDetails = useCallback((offer: Offer): Promise<OfferDetails> => {
+    const isAlwaysFree = offer.is_free && offer.normal_price === 0
+    const key = `${isAlwaysFree ? 'free' : 'offer'}-${offer.id}`
+
+    const saved = detailsCache.current.get(key)
     if (saved) return Promise.resolve(saved)
 
-    let request = detailsRequests.current.get(id)
+    let request = detailsRequests.current.get(key)
+
     if (!request) {
-      request = fetchOfferDetails(id)
+      request = (isAlwaysFree
+        ? fetchFreeGameDetails(offer.id)
+        : fetchOfferDetails(offer.id)
+      )
         .then((fetched) => {
-          detailsCache.current.set(id, fetched)
+          detailsCache.current.set(key, fetched)
           return fetched
         })
-        .finally(() => detailsRequests.current.delete(id))
+        .finally(() => detailsRequests.current.delete(key))
+
       request.catch(() => {})
-      detailsRequests.current.set(id, request)
+      detailsRequests.current.set(key, request)
     }
+
     return request
   }, [])
 
   useEffect(() => {
     if (!selectedOffer) return
-    const saved = detailsCache.current.get(selectedOffer.id)
+
+    const isAlwaysFree =
+      selectedOffer.is_free && selectedOffer.normal_price === 0
+
+    const key = `${isAlwaysFree ? 'free' : 'offer'}-${selectedOffer.id}`
+
+    const saved = detailsCache.current.get(key)
+
     if (saved) {
       setDetails(saved)
       return
@@ -352,13 +392,15 @@ function App() {
 
     setDetails('loading')
     let current = true
-    loadDetails(selectedOffer.id)
+
+    loadDetails(selectedOffer)
       .then((fetched) => {
         if (current) setDetails(fetched)
       })
       .catch(() => {
         if (current) setDetails('error')
       })
+
     return () => {
       current = false
     }
@@ -454,11 +496,11 @@ function App() {
       title: game.title,
       store: game.store,
       claim_url: game.claim_url,
-      thumb: null,
+      thumb: game.thumb ?? null,
       steam_app_id: game.steam_app_id,
       genres: game.genres,
-      description: null,
-      short_description: null,
+      description: game.description,
+      short_description: game.description,
       normal_price: 0,
       sale_price: 0,
       savings: 100,
@@ -921,7 +963,7 @@ function App() {
                     offer={offer}
                     now={now}
                     onClick={() => setSelectedOffer(offer)}
-                    onPrefetch={() => loadDetails(offer.id)}
+                    onPrefetch={() => loadDetails(offer)}
                   />
                 ))}
               </ul>
@@ -1092,8 +1134,14 @@ function App() {
                   <p className="price" style={{ margin: 0, fontSize: '12px' }}>
                     {selectedOffer.is_free ? (
                       <>
-                        <s>${selectedOffer.normal_price.toFixed(2)}</s>{' '}
-                        <strong style={{ color: '#4ade80' }}>Free right now</strong>
+                        {selectedOffer.normal_price === 0 ? (
+                          <strong style={{ color: '#4ade80' }}>Free</strong>
+                        ) : (
+                          <>
+                            <s>${selectedOffer.normal_price.toFixed(2)}</s>{' '}
+                            <strong style={{ color: '#4ade80' }}>Free right now</strong>
+                          </>
+                        )}
                       </>
                     ) : (
                       <>
@@ -1101,13 +1149,21 @@ function App() {
                         <span style={{ color: '#4ade80' }}>${selectedOffer.sale_price.toFixed(2)}</span>
                       </>
                     )}{' '}
-                    <span className="savings">−{Math.round(selectedOffer.savings)}%</span>
+                    {!(selectedOffer.is_free && selectedOffer.normal_price === 0) && (
+                      <span className="savings">
+                        −{Math.round(selectedOffer.savings)}%
+                      </span>
+                    )}
                   </p>
                 </div>
-                <div style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '6px', padding: '8px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '2px' }}>Time Left</div>
-                  <div style={{ fontWeight: 600, fontSize: '12px' }}>{timeLeft(selectedOffer.ends_at) || '—'}</div>
-                </div>
+                {!(selectedOffer.is_free && selectedOffer.normal_price === 0) && (
+                  <div style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '6px', padding: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '2px' }}>Time Left</div>
+                    <div style={{ fontWeight: 600, fontSize: '12px' }}>
+                      {timeLeft(selectedOffer.ends_at) || '—'}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>

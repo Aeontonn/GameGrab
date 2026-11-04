@@ -49,6 +49,23 @@ export async function fetchOfferDetails(id: number): Promise<OfferDetails> {
   }
 }
 
+// Fetches the description and system requirements for a permanently free game.
+export async function fetchFreeGameDetails(id: number): Promise<OfferDetails> {
+  const response = await fetch(`${API_URL}/free-games/${id}`)
+
+  if (!response.ok) {
+    throw new Error(`Backend responded ${response.status}`)
+  }
+
+  const details: OfferDetails = await response.json()
+
+  return {
+    description: details.description ?? null,
+    minimum_requirements: details.minimum_requirements ?? null,
+    recommended_requirements: details.recommended_requirements ?? null,
+  }
+}
+
 // Fetches the games that are always free. The backend already sorts them
 // with the most played first.
 export async function fetchFreeGames(): Promise<FreeGame[]> {

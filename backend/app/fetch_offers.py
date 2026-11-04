@@ -201,6 +201,7 @@ def steam_details(app_id: str) -> dict | None:
     return {
         "type": data.get("type"),
         "is_free": bool(data.get("is_free")),
+        "thumb": data.get("header_image"),
         "adult": is_adult(data),
         "launcher_notice": launcher_notice(data),
         "genres": [
