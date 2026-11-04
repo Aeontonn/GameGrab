@@ -234,6 +234,32 @@ def offer_details(offer_id: int):
 
     return dict(row)
 
+# The description and system requirements for a permanently free game.
+@app.get("/free-games/{game_id}")
+def free_game_details(game_id: int):
+    try:
+        with engine.connect() as connection:
+            row = connection.execute(
+                text("""
+                    SELECT description, minimum_requirements,
+                           recommended_requirements
+                    FROM free_games
+                    WHERE id = :id
+                """),
+                {"id": game_id},
+            ).mappings().first()
+
+    except SQLAlchemyError as exc:
+        return database_error(exc)
+
+    if row is None:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": "Free game not found"}
+        )
+
+    return dict(row)
+
 
 # Games that are always free (free to play), most played first. Fetched by
 # fetch_free_games.py once a day. No freshness check like in /offers:
@@ -247,7 +273,7 @@ def free_games(request: Request):
         with engine.connect() as connection:
             rows = connection.execute(
                 text("""
-                    SELECT id, title, store, steam_app_id, claim_url, genres
+                    SELECT id, title, store, steam_app_id, claim_url, genres, thumb, description
                     FROM free_games
                     ORDER BY rank
                 """)
