@@ -8,6 +8,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 import gzip
 import json
+import logging
 import os
 import re
 import time
@@ -40,6 +41,9 @@ CACHE_SECONDS = int(os.getenv("CACHE_SECONDS", "300"))
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 app = FastAPI(title="GameGrab API")
+
+# uvicorn's logger, so the messages show up in Render's log next to the requests.
+logger = logging.getLogger("uvicorn.error")
 
 # Lets requests from our frontend through. Replace with the real address at launch.
 app.add_middleware(
@@ -88,12 +92,15 @@ def save(key: str, answer: list, request: Request) -> Response:
 def database_error(exc: SQLAlchemyError) -> JSONResponse:
     # If we couldn't reach the database we say so plainly instead of responding
     # with an empty list, which the frontend would read as "there are no offers".
+    # The real error goes to the server log only: it can contain the database's
+    # host name and user, which visitors shouldn't see.
+    logger.error("Database error: %s", exc.__cause__ or exc)
     return JSONResponse(
         status_code=503,
         content={
             "status": "error",
             "database": "disconnected",
-            "detail": str(exc.__cause__ or exc),
+            "detail": "Could not reach the database",
         },
     )
 
@@ -159,7 +166,7 @@ def limit_series(rows: list, cap: int) -> list:
 # sends them when someone opens a game. The cards get the first sentence.
 #
 # No freshness check on fetched_at: fetch_offers.py removes offers that haven't
-# been seen for 12 hours, so the table holds the latest offers it could get.
+# been seen for 48 hours, so the table holds the latest offers it could get.
 # If the fetch is delayed (GitHub often runs it hours late) we keep showing
 # that snapshot instead of an empty page.
 @app.get("/offers")
@@ -205,11 +212,18 @@ def offers(request: Request):
     ], request)
 
 
+# The end of the first sentence: . ! or ? followed by a space or the end of the
+# text, at least 20 characters in. The space rule keeps "v1.5" whole, and the
+# minimum length keeps short abbreviations like "Dr." or "St." from ending it.
+_FIRST_SENTENCE = re.compile(r"\s*(.{20,}?[.!?])(?=\s|$)", re.DOTALL)
+
+
 def short_description(description: str | None) -> str | None:
     """The first sentence of the description, shown on the card."""
-    if not description:
+    if not description or not description.strip():
         return None
-    return description.split(".")[0].strip() + "."
+    match = _FIRST_SENTENCE.match(description)
+    return match.group(1) if match else description.strip()
 
 
 # The longer texts for one offer, fetched when its details window opens.

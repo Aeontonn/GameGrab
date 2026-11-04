@@ -69,4 +69,4 @@ jobs:
 
       # Catches misspelled imports and errors in the FastAPI setup.
       - name: Loads
-        run: python -c "import app.main, app.fetch_offers"
+        run: python -c "import app.main, app.fetch_offers, app.fetch_free_games"

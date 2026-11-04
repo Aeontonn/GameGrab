@@ -21,7 +21,14 @@ import time
 from sqlalchemy import text
 
 # Reuses the Steam lookup and title filter from the offer fetcher.
-from app.fetch_offers import USER_AGENT, engine, looks_adult, looks_like_extra, steam_details
+from app.fetch_offers import (
+    USER_AGENT,
+    clean_steam_requirements,
+    engine,
+    looks_adult,
+    looks_like_extra,
+    steam_details,
+)
 
 # How many games the list should contain.
 TARGET = 150
@@ -284,7 +291,7 @@ def saved_steam_games() -> dict[str, dict]:
     with engine.connect() as connection:
         rows = connection.execute(
             text("""
-                SELECT steam_app_id, title, genres, claim_url
+                SELECT steam_app_id, title, genres, claim_url,
                         description, thumb, minimum_requirements,
                         recommended_requirements
                 FROM free_games
@@ -449,14 +456,16 @@ def main() -> None:
     if not rows:
         raise SystemExit("No games found – leaving the database untouched.")
 
+    # The hand-written requirements use <br> like Steam's, so they go through
+    # the same cleanup. The details window shows plain text with line breaks.
     other_rows = [
-    {
-        **game,
-        "rank": len(rows) + position,
-        "minimum_requirements": game.get("minimum_requirements"),
-        "recommended_requirements": game.get("recommended_requirements"),
-    }
-    for position, game in enumerate(OTHER_STORE_GAMES, start=1)
+        {
+            **game,
+            "rank": len(rows) + position,
+            "minimum_requirements": clean_steam_requirements(game.get("minimum_requirements")),
+            "recommended_requirements": clean_steam_requirements(game.get("recommended_requirements")),
+        }
+        for position, game in enumerate(OTHER_STORE_GAMES, start=1)
     ]
 
     removed = save(rows, other_rows)

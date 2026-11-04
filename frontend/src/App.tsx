@@ -25,7 +25,10 @@ const timeLeft = (endsAt: string | null): string | null => {
   const msLeft = new Date(endsAt).getTime() - Date.now()
   if (msLeft <= 0) return 'Ending soon'
   const hours = Math.floor(msLeft / 3_600_000)
-  if (hours < 24) return hours <= 1 ? 'Less than 1 hour left' : `${hours} hours left`
+  if (hours < 24) {
+    if (hours < 1) return 'Less than 1 hour left'
+    return hours === 1 ? '1 hour left' : `${hours} hours left`
+  }
   const days = Math.floor(hours / 24)
   return days === 1 ? '1 day left' : `${days} days left`
 }
@@ -74,6 +77,27 @@ const imagesFor = (offer: Offer): string[] => {
 const withoutRequirementLabel = (value: string): string =>
   value.replace(/^(Minimum|Recommended):\s*/i, '')
 
+// A list saved in localStorage, or an empty list if there is none. Saved data
+// can be broken (edited by hand, or written by an older version of the site),
+// and storage can be blocked entirely, so neither may crash the page.
+const readStoredList = (key: string): unknown[] => {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+// True for free-to-play games from /free-games, which App turns into offers
+// with price 0. Time-limited free offers still have their normal price.
+const isAlwaysFree = (offer: Offer): boolean => offer.is_free && offer.normal_price === 0
+
+// Free-to-play games and offers have separate ids (free_games.id and
+// offers.id) that can be the same number, so keys say which one they are.
+const detailsKey = (offer: Offer): string =>
+  `${isAlwaysFree(offer) ? 'free' : 'offer'}-${offer.id}`
+
 const ITEMS_PER_PAGE = 40
 
 const FILTER_GENRES = [
@@ -115,7 +139,7 @@ function getPageNumbers(current: number, total: number): (number | '...')[] {
 
   if (current > 5) pages.push('...')
 
-  if (current > 4 && current < total - 1) pages.push(current)
+  if (current > 4 && current < total) pages.push(current)
 
   if (current < total - 2) pages.push('...')
 
@@ -183,8 +207,8 @@ function OfferCard({
     offer.review_total > 0 &&
     offer.review_source
 
-  const isAlwaysFree = offer.is_free && offer.normal_price === 0
-  const left = isAlwaysFree ? null : exactTimeLeft(offer.ends_at, now)
+  const alwaysFree = isAlwaysFree(offer)
+  const left = alwaysFree ? null : exactTimeLeft(offer.ends_at, now)
 
   return (
     <li
@@ -198,49 +222,51 @@ function OfferCard({
 
       <div className="offer-card-body">
 
-        
-<div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-  <h3>{offer.title}</h3>
-  <button
-    type="button"
-    disabled={watchBusy}
-    title={watched ? 'Sluta bevaka' : 'Watch game'}
-    aria-label={watched ? `Sluta bevaka ${offer.title}` : `Bevaka ${offer.title}`}
-
-onClick={(e) => {
-  e.stopPropagation()
-  onToggleWatch()
-}}
-
-
-    style={{
-      background: 'transparent',
-      border: 'none',
-      color: watched ? '#4ade80' : '#85899a',
-      padding: '4px',
-      cursor: 'pointer',
-      opacity: 0.75,
-      flexShrink: 0,
-      display: 'flex',
-      alignItems: 'center',
-    }}
-  >
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-      <path d="M10 21h4" />
-    </svg>
-  </button>
-</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h3>{offer.title}</h3>
+          {/* Only offers can be watched. A free-to-play game never stops being
+              free, and its id belongs to free_games, not offers, so watching it
+              would save the id of an unrelated offer. */}
+          {!alwaysFree && (
+            <button
+              type="button"
+              disabled={watchBusy}
+              title={watched ? 'Stop watching' : 'Watch game'}
+              aria-label={watched ? `Stop watching ${offer.title}` : `Watch ${offer.title}`}
+              aria-pressed={watched}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleWatch()
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: watched ? '#4ade80' : '#85899a',
+                padding: '4px',
+                cursor: 'pointer',
+                opacity: 0.75,
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                <path d="M10 21h4" />
+              </svg>
+            </button>
+          )}
+        </div>
 
         {offer.launcher_notice && (
           <p className="launcher-warning">⚠ Also requires: {offer.launcher_notice}</p>
@@ -280,14 +306,14 @@ onClick={(e) => {
               {offer.is_free ? 'Free' : `$${offer.sale_price.toFixed(2)}`}
             </span>
 
-            {!isAlwaysFree && (
+            {!alwaysFree && (
               <>
                 <s>${offer.normal_price.toFixed(2)}</s>
                 <span className="savings">−{Math.round(offer.savings)}%</span>
               </>
             )}
           </p>
-            {!isAlwaysFree && (
+            {!alwaysFree && (
               <span className={`offer-card-time ${left?.urgency ?? 'normal'}`}>
                 {left && left.urgency !== 'normal' && (
                   <svg
@@ -325,7 +351,11 @@ type FreeLoad =
   | { state: 'error' }
 
 function App() {  
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
+  // Already on if the visitor allowed notifications on an earlier visit, so the
+  // checks keep running after a reload without clicking the button again.
+  const [notificationsEnabled, setNotificationsEnabled] = useState(
+    () => typeof Notification !== 'undefined' && Notification.permission === 'granted',
+  )
   const [watchedIds, setWatchedIds] = useState<number[]>([])
   const [watchedGames, setWatchedGames] = useState<{ offer_id: number; title: string }[]>([])
   const [watchBusyIds, setWatchBusyIds] = useState<number[]>([])
@@ -349,7 +379,11 @@ function App() {
   const [slowStart, setSlowStart] = useState(false)
   const [requirementsOpen, setRequirementsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [searchHistory, setSearchHistory] = useState<string[]>([])
+  const [searchHistory, setSearchHistory] = useState<string[]>(() =>
+    readStoredList('gamegrab-search-history').filter(
+      (term): term is string => typeof term === 'string',
+    ),
+  )
   const [showHistory, setShowHistory] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
   const historyRef = useRef<HTMLDivElement>(null)
@@ -358,11 +392,7 @@ function App() {
   const mainRef = useRef<HTMLElement>(null)
   const searchWrapperRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    const saved = localStorage.getItem('gamegrab-search-history')
-    if (saved) setSearchHistory(JSON.parse(saved))
-  }, [])
-  
+
   useEffect(() => {
     if (!supabase) return
 
@@ -373,8 +403,10 @@ function App() {
       const { data: { user } } = await client.auth.getUser()
       if (!active) return
 
+      // Logged out: empty both, or the last user's games stay in the watchlist.
       if (!user) {
         setWatchedIds([])
+        setWatchedGames([])
         return
       }
 
@@ -539,9 +571,14 @@ useEffect(() => {
 
   let active = true
   let checking = false
+  // Whether each watched offer was free last time we looked, saved as
+  // [offer id, is free] pairs. Anything else in storage is ignored.
   const previousPrices = new Map<number, boolean>(
-  JSON.parse(localStorage.getItem('gamegrab-previous-prices') || '[]')
-)
+    readStoredList('gamegrab-previous-prices').filter(
+      (pair): pair is [number, boolean] =>
+        Array.isArray(pair) && typeof pair[0] === 'number' && typeof pair[1] === 'boolean',
+    ),
+  )
 
 
   const checkWatchedGames = async () => {
@@ -575,10 +612,10 @@ useEffect(() => {
 
   void checkWatchedGames()
 
-  const interval = window.setInterval(
-    checkWatchedGames,
-    60_000
-  )
+  // Every 5 minutes. The backend caches /offers for that long (CACHE_SECONDS)
+  // and the offers only change once an hour, so checking more often would
+  // download the whole list again for nothing.
+  const interval = window.setInterval(checkWatchedGames, 5 * 60_000)
 
   return () => {
     active = false
@@ -594,8 +631,7 @@ useEffect(() => {
   }, [])
 
   const loadDetails = useCallback((offer: Offer): Promise<OfferDetails> => {
-    const isAlwaysFree = offer.is_free && offer.normal_price === 0
-    const key = `${isAlwaysFree ? 'free' : 'offer'}-${offer.id}`
+    const key = detailsKey(offer)
 
     const saved = detailsCache.current.get(key)
     if (saved) return Promise.resolve(saved)
@@ -603,7 +639,7 @@ useEffect(() => {
     let request = detailsRequests.current.get(key)
 
     if (!request) {
-      request = (isAlwaysFree
+      request = (isAlwaysFree(offer)
         ? fetchFreeGameDetails(offer.id)
         : fetchOfferDetails(offer.id)
       )
@@ -620,22 +656,17 @@ useEffect(() => {
     return request
   }, [])
 
+  // Opens the details window. The details are set here, in the same render as
+  // the window, so it never shows the previous game's description first.
+  const openOffer = (offer: Offer) => {
+    setDetails(detailsCache.current.get(detailsKey(offer)) ?? 'loading')
+    setSelectedOffer(offer)
+  }
+
+  // Fills in the details if they weren't cached when the window opened.
+  // loadDetails answers straight from the cache if a prefetch finished since.
   useEffect(() => {
     if (!selectedOffer) return
-
-    const isAlwaysFree =
-      selectedOffer.is_free && selectedOffer.normal_price === 0
-
-    const key = `${isAlwaysFree ? 'free' : 'offer'}-${selectedOffer.id}`
-
-    const saved = detailsCache.current.get(key)
-
-    if (saved) {
-      setDetails(saved)
-      return
-    }
-
-    setDetails('loading')
     let current = true
 
     loadDetails(selectedOffer)
@@ -666,6 +697,17 @@ useEffect(() => {
     return () => {
       html.style.overflow = ''
     }
+  }, [selectedOffer])
+
+  // Escape closes the details window, like the × button and clicking outside.
+  // Only listens while a game is open, so Escape works as usual elsewhere.
+  useEffect(() => {
+    if (!selectedOffer) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedOffer(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
   }, [selectedOffer])
 
   useEffect(() => {
@@ -964,8 +1006,8 @@ useEffect(() => {
 
 <button
   type="button"
-  title={`Stop watching${game.title}`}
-  aria-label={`Sluta bevaka ${game.title}`}
+  title={`Stop watching ${game.title}`}
+  aria-label={`Stop watching ${game.title}`}
   disabled={watchBusyIds.includes(game.offer_id)}
   onClick={() => toggleWatch({
     id: game.offer_id,
@@ -1337,7 +1379,7 @@ useEffect(() => {
                     ].map(({ label, count }) => (
                       <div key={label} className="filter-menu-count">
                         <dt>{label}</dt>
-                        <dd>{count.toLocaleString('sv-SE')}</dd>
+                        <dd>{count.toLocaleString('en-US')}</dd>
                       </div>
                     ))}
                   </dl>
@@ -1366,10 +1408,10 @@ useEffect(() => {
               <ul className="offers">
                 {paginatedOffers.map((offer) => (
                   <OfferCard
-                    key={`${offer.id}-${offer.store}`}
+                    key={detailsKey(offer)}
                     offer={offer}
                     now={now}
-                    onClick={() => setSelectedOffer(offer)}
+                    onClick={() => openOffer(offer)}
 onPrefetch={() => loadDetails(offer)}
 watched={watchedIds.includes(offer.id)}
 onToggleWatch={() => toggleWatch(offer)}
@@ -1559,14 +1601,14 @@ watchBusy={watchBusyIds.includes(offer.id)}
                         <span style={{ color: '#4ade80' }}>${selectedOffer.sale_price.toFixed(2)}</span>
                       </>
                     )}{' '}
-                    {!(selectedOffer.is_free && selectedOffer.normal_price === 0) && (
+                    {!isAlwaysFree(selectedOffer) && (
                       <span className="savings">
                         −{Math.round(selectedOffer.savings)}%
                       </span>
                     )}
                   </p>
                 </div>
-                {!(selectedOffer.is_free && selectedOffer.normal_price === 0) && (
+                {!isAlwaysFree(selectedOffer) && (
                   <div style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '6px', padding: '8px', textAlign: 'center' }}>
                     <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '2px' }}>Time Left</div>
                     <div style={{ fontWeight: 600, fontSize: '12px' }}>

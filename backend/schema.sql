@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS offers (
 
     title           TEXT NOT NULL,
 
-    -- Steam, GOG or Epic Games. What the frontend filters on.
+    -- Steam, GOG, Epic Games or Ubisoft. What the frontend filters on.
     store           TEXT NOT NULL,
 
     -- Prices in dollars, as CheapShark provides them.
@@ -113,6 +113,13 @@ ALTER COLUMN steam_app_id DROP NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS free_games_store_title
 ON free_games (store, title) WHERE steam_app_id IS NULL;
 
+-- Image, description and PC system requirements, shown on the card and in the
+-- details window (GET /free-games/{id}). NULL when Steam doesn't provide them.
+ALTER TABLE free_games ADD COLUMN IF NOT EXISTS thumb TEXT;
+ALTER TABLE free_games ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE free_games ADD COLUMN IF NOT EXISTS minimum_requirements TEXT;
+ALTER TABLE free_games ADD COLUMN IF NOT EXISTS recommended_requirements TEXT;
+
 -- Deals that Steam or GOG said are not games (DLC, demos, soundtracks…).
 -- Remembered so fetch_offers.py doesn't look them up again every hour.
 CREATE TABLE IF NOT EXISTS skipped_deals (
@@ -135,3 +142,43 @@ ALTER TABLE offers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE free_games ENABLE ROW LEVEL SECURITY;
 ALTER TABLE skipped_deals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fetch_state ENABLE ROW LEVEL SECURITY;
+
+-- Each user's watchlist. Unlike the tables above, the frontend reads and
+-- writes this one directly through Supabase with the publishable key, so it
+-- needs policies: a logged-in user may only see and change their own rows.
+CREATE TABLE IF NOT EXISTS watched_games (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id     UUID NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+
+    -- offers.id of the watched offer. No foreign key: offers are deleted when
+    -- they end, and the watchlist should keep the title anyway.
+    offer_id    INTEGER NOT NULL,
+
+    -- Saved so the watchlist can show the game after the offer is gone.
+    title       TEXT NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    -- The frontend upserts on these two, so a game can't be watched twice.
+    UNIQUE (user_id, offer_id)
+);
+
+ALTER TABLE watched_games ENABLE ROW LEVEL SECURITY;
+
+-- CREATE POLICY has no IF NOT EXISTS, so each one is dropped first. That keeps
+-- the file safe to re-run. UPDATE is needed too, since an upsert can update.
+DROP POLICY IF EXISTS "Users read their own watchlist" ON watched_games;
+CREATE POLICY "Users read their own watchlist" ON watched_games
+    FOR SELECT TO authenticated USING ((SELECT auth.uid()) = user_id);
+
+DROP POLICY IF EXISTS "Users add to their own watchlist" ON watched_games;
+CREATE POLICY "Users add to their own watchlist" ON watched_games
+    FOR INSERT TO authenticated WITH CHECK ((SELECT auth.uid()) = user_id);
+
+DROP POLICY IF EXISTS "Users update their own watchlist" ON watched_games;
+CREATE POLICY "Users update their own watchlist" ON watched_games
+    FOR UPDATE TO authenticated
+    USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
+
+DROP POLICY IF EXISTS "Users remove from their own watchlist" ON watched_games;
+CREATE POLICY "Users remove from their own watchlist" ON watched_games
+    FOR DELETE TO authenticated USING ((SELECT auth.uid()) = user_id);
