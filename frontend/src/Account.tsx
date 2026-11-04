@@ -21,6 +21,8 @@ const errorText = (error: AuthError): string => {
       return 'There is already an account with that email. Log in instead.'
     case 'weak_password':
       return `Choose a stronger password, at least ${MIN_PASSWORD_LENGTH} characters.`
+    case 'same_password':
+      return 'Choose a password you have not used before.'
     case 'email_address_invalid':
       return "That email address doesn't look right."
     case 'over_request_rate_limit':
@@ -52,6 +54,73 @@ function useSession(): Session | null | undefined {
   return session
 }
 
+// True after the visitor comes back from the "Forgot password?" email. Supabase
+// has then logged them in, and we ask for a new password straight away.
+function usePasswordRecovery(): [boolean, (value: boolean) => void] {
+  const [recovering, setRecovering] = useState(false)
+
+  useEffect(() => {
+    if (!supabase) return
+
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
+      // Logging out cancels it, so the form doesn't come back at the next login.
+      if (event === 'SIGNED_OUT') setRecovering(false)
+    })
+    return () => data.subscription.unsubscribe()
+  }, [])
+
+  return [recovering, setRecovering]
+}
+
+// The form for choosing a new password after the reset link.
+function NewPasswordForm({ onDone }: { onDone: () => void }) {
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!supabase) return
+
+    setBusy(true)
+    setError(null)
+
+    // The visitor is already logged in through the link, so this only changes
+    // the password on their account.
+    const { error } = await supabase.auth.updateUser({ password })
+    setBusy(false)
+    if (error) return setError(errorText(error))
+    onDone()
+  }
+
+  return (
+    <form className="auth-form" onSubmit={submit}>
+      <p>Choose a new password.</p>
+
+      <label>
+        New password
+        <input
+          type="password"
+          autoComplete="new-password"
+          required
+          minLength={MIN_PASSWORD_LENGTH}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </label>
+
+      <p className="hint">At least {MIN_PASSWORD_LENGTH} characters.</p>
+
+      {error && <p className="error" role="alert">{error}</p>}
+
+      <button type="submit" className="primary" disabled={busy}>
+        {busy ? 'Wait…' : 'Save password'}
+      </button>
+    </form>
+  )
+}
+
 type Mode = 'login' | 'signup'
 
 // The form for logging in or creating an account.
@@ -64,6 +133,8 @@ function AuthForm({ onDone }: { onDone: () => void }) {
 
   // Shown after sign up when Supabase sends a confirmation email.
   const [sentTo, setSentTo] = useState<string | null>(null)
+  // True when the email we sent is a password reset, not a sign up confirmation.
+  const [resetSent, setResetSent] = useState(false)
 
   const switchMode = (next: Mode) => {
     setMode(next)
@@ -104,14 +175,42 @@ function AuthForm({ onDone }: { onDone: () => void }) {
     setPassword('')
   }
 
+  // Sends an email with a link for choosing a new password. Uses the address
+  // already typed in the form, so the visitor doesn't have to type it twice.
+  const forgotPassword = async () => {
+    if (!supabase) return
+    if (!email) return setError('Type your email above first.')
+
+    setBusy(true)
+    setError(null)
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // Same rule as for sign up: must be listed under URL Configuration.
+      redirectTo: window.location.origin,
+    })
+    setBusy(false)
+    if (error) return setError(errorText(error))
+
+    // Like sign up, Supabase answers the same whether the email has an account
+    // or not. With PKCE the link only works in this browser.
+    setResetSent(true)
+    setSentTo(email)
+    setPassword('')
+  }
+
   if (sentTo) {
     return (
       <div className="auth-form">
         <p>
-          We sent a link to <strong>{sentTo}</strong>. Click it to confirm your account,
-          then log in.
+          We sent a link to <strong>{sentTo}</strong>.{' '}
+          {resetSent
+            ? 'Open it in this browser to choose a new password.'
+            : 'Click it to confirm your account, then log in.'}
         </p>
-        <button type="button" onClick={() => { setSentTo(null); switchMode('login') }}>
+        <button
+          type="button"
+          onClick={() => { setSentTo(null); setResetSent(false); switchMode('login') }}
+        >
           Back to log in
         </button>
       </div>
@@ -166,6 +265,12 @@ function AuthForm({ onDone }: { onDone: () => void }) {
         <p className="hint">At least {MIN_PASSWORD_LENGTH} characters.</p>
       )}
 
+      {mode === 'login' && (
+        <button type="button" className="link-button" onClick={forgotPassword} disabled={busy}>
+          Forgot password?
+        </button>
+      )}
+
       {error && <p className="error" role="alert">{error}</p>}
 
       <button type="submit" className="primary" disabled={busy}>
@@ -178,6 +283,7 @@ function AuthForm({ onDone }: { onDone: () => void }) {
 // Top right in the header: who is logged in, or a button to log in.
 export default function Account() {
   const session = useSession()
+  const [recovering, setRecovering] = usePasswordRecovery()
   const [open, setOpen] = useState(false)
 
   // Login isn't set up, or we don't know the session yet – show nothing rather
@@ -191,6 +297,7 @@ export default function Account() {
         <button type="button" onClick={() => supabase?.auth.signOut()}>
           Log out
         </button>
+        {recovering && <NewPasswordForm onDone={() => setRecovering(false)} />}
       </div>
     )
   }
