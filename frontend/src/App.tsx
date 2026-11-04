@@ -325,6 +325,7 @@ type FreeLoad =
   | { state: 'error' }
 
 function App() {  
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [watchedIds, setWatchedIds] = useState<number[]>([])
   const [watchedGames, setWatchedGames] = useState<{ offer_id: number; title: string }[]>([])
   const [watchBusyIds, setWatchBusyIds] = useState<number[]>([])
@@ -470,6 +471,25 @@ setWatchedGames((current) =>
     }
   }
 
+  
+const enableNotifications = async () => {
+  if (!('Notification' in window)) {
+    alert('Your browser does not support notifications.')
+    return
+  }
+
+  const permission = await Notification.requestPermission()
+
+  if (permission === 'granted') {
+    setNotificationsEnabled(true)
+    new Notification('GameGrab', {
+      body: 'Notifications are enabled!',
+    })
+  } else {
+    alert('Please allow notifications in your browser settings.')
+  }
+}
+
 
   const saveSearch = (term: string) => {
     const trimmed = term.trim()
@@ -507,6 +527,65 @@ setWatchedGames((current) =>
       .then((offers) => setLoad({ state: 'ok', offers }))
       .catch((error: Error) => setLoad({ state: 'error', message: error.message }))
   }, [])
+
+  
+useEffect(() => {
+  if (
+    !notificationsEnabled ||
+    !('Notification' in window) ||
+    Notification.permission !== 'granted' ||
+    watchedIds.length === 0
+  ) return
+
+  let active = true
+  let checking = false
+  const previousPrices = new Map<number, boolean>(
+  JSON.parse(localStorage.getItem('gamegrab-previous-prices') || '[]')
+)
+
+
+  const checkWatchedGames = async () => {
+    if (checking) return
+    checking = true
+
+    try {
+      const offers = await fetchOffers()
+      if (!active) return
+
+      for (const offer of offers) {
+        if (!watchedIds.includes(offer.id)) continue
+
+        const previous = previousPrices.get(offer.id)
+
+    if (previous === false && offer.is_free) {
+            new Notification('GameGrab - Free game!', {
+            body: `${offer.title} is now free!`,
+          })
+        }
+
+        previousPrices.set(offer.id, offer.is_free)
+        localStorage.setItem('gamegrab-previous-prices', JSON.stringify([...previousPrices]))
+      }
+    } catch (error) {
+      console.error('Could not check watched games:', error)
+    } finally {
+      checking = false
+    }
+  }
+
+  void checkWatchedGames()
+
+  const interval = window.setInterval(
+    checkWatchedGames,
+    60_000
+  )
+
+  return () => {
+    active = false
+    window.clearInterval(interval)
+  }
+}, [notificationsEnabled, watchedIds])
+
 
   useEffect(() => {
     fetchFreeGames()
@@ -781,6 +860,8 @@ setWatchedGames((current) =>
       padding: '10px 14px',
       cursor: 'pointer',
       whiteSpace: 'nowrap',
+      fontSize: '14px',
+      fontWeight: 600,
     }}
   >
     <svg
@@ -800,6 +881,10 @@ setWatchedGames((current) =>
      My watchlist ({watchedIds.length})
   </button>
 
+  
+
+
+
   <Account />
 </div>
 
@@ -817,10 +902,46 @@ setWatchedGames((current) =>
       maxWidth: '900px',
     }}
   >
-    <h2>My watchlist</h2>
+  
+<div
+  style={{
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '0px',
+  }}
+>
+ <h2 style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>
+  My watchlist
+</h2>
+
+  <button
+    type="button"
+    onClick={enableNotifications}
+    disabled={notificationsEnabled}
+    style={{
+      background: 'var(--surface)',
+      color: 'var(--text)',
+      border: '1px solid var(--line-strong)',
+      borderRadius: '8px',
+      padding: '8px 12px',
+      cursor: notificationsEnabled ? 'default' : 'pointer',
+      whiteSpace: 'nowrap',
+      fontSize: '14px',
+      fontWeight: 600,
+    }}
+  >
+    {notificationsEnabled ? 'Notifications enabled' : 'Enable notifications'}
+  </button>
+</div>
+
 
     {watchedIds.length === 0 ? (
-      <p>You're not watching any games yet.</p>
+
+<p style={{ fontSize: '14px', fontWeight: 400, margin: '8px 0 0' }}>
+  You're not watching any games yet.
+</p>
     ) : (
      
 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -836,7 +957,9 @@ setWatchedGames((current) =>
         borderRadius: '8px',
       }}
     >
-      <span>{game.title}</span>
+      <span style={{ fontSize: '14px', fontWeight: 400 }}>
+  {game.title}
+</span>
 
 
 <button
@@ -1247,18 +1370,11 @@ setWatchedGames((current) =>
                     offer={offer}
                     now={now}
                     onClick={() => setSelectedOffer(offer)}
-<<<<<<< HEAD
-                    onPrefetch={() => loadDetails(offer)}
-                  />
-=======
-                    
-onPrefetch={() => loadDetails(offer.id)}
+onPrefetch={() => loadDetails(offer)}
 watched={watchedIds.includes(offer.id)}
 onToggleWatch={() => toggleWatch(offer)}
 watchBusy={watchBusyIds.includes(offer.id)}
 />
-
->>>>>>> origin/main
                 ))}
               </ul>
             ) : (
