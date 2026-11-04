@@ -1,84 +1,109 @@
 # GameGrab
 
-GameGrab is a project we are working on in the course Agile Development.
+GameGrab gathers free games and big discounts on PC games from several stores
+and shows them in one place. It was built by Group 4 in the course
+Agile Development.
 
-The goal is to build a website that gathers information about free games and
-time-limited free offers from different gaming platforms in one place.
+Only real bargains are shown: games that are free right now, or at least 80% off.
+Adult games, DLC, bundles and special editions are filtered out.
 
-## MVP
+## Features
 
-The first version of GameGrab should make it possible to:
-
-- See current free offers on games
-- See basic information about the games
-- See which platform the offer is on
-- See how long the offer lasts
-- Go to the platform where the game can be claimed
-- Filter between different platforms and genres
-- See Steam review scores for the games
-- Browse offers page by page
-- See popular games that are always free (free to play)
-- Create an account and log in
-
-Adult games are filtered out, and only real bargains are shown: free games and
-offers with at least 80% off.
+- **Offers from four stores:** Steam, GOG, Epic Games and Ubisoft, refreshed every hour.
+- **Popular free-to-play games:** the 150 most played free games on Steam, plus a
+  handful from Riot Games and Battle.net.
+- **Tabs:** All, Free, Free for a limited time, and Discounted.
+- **Search** with the three most recent searches remembered in the browser.
+- **Filters:** store, genre and "ends within 1 or 7 days".
+- **Countdown** on every card. Offers ending within 48 hours are highlighted,
+  and within 24 hours they are marked as urgent.
+- **Details window** with description, system requirements, Steam review score,
+  price, time left, a link to the store and a "Copy link" button.
+- **Steam review scores** on the cards, also for games sold on GOG or Epic.
+- **Pagination**, 40 games per page.
+- **Accounts:** sign up, log in, log out and reset a forgotten password.
+- **Watchlist:** logged-in users can watch games with the bell icon and see them
+  under "My watchlist".
+- **Mobile:** on a phone, Steam links open in the Steam app if it's installed.
 
 ## Tech stack
 
-**Frontend**
-- React
-- TypeScript
-- Vite
+| Part | Technology | Hosted on |
+| --- | --- | --- |
+| Frontend | React 19, TypeScript, Vite | Vercel |
+| Backend | Python, FastAPI, SQLAlchemy | Render |
+| Database | PostgreSQL | Supabase |
+| Accounts and watchlist | Supabase Auth and Supabase's API | Supabase |
+| Data fetching | Python scripts on a schedule | GitHub Actions |
+| Data sources | CheapShark, Steam, GOG, Epic Games | – |
 
-**Backend**
-- Python
-- FastAPI
-- SQLAlchemy
+## How it fits together
 
-**Database and login**
-- PostgreSQL via Supabase
-- Supabase Auth for accounts
+```text
+             CheapShark, Steam, GOG, Epic
+                        │
+          fetch_offers.py (every hour)
+          fetch_free_games.py (every day)
+             run by GitHub Actions
+                        │ writes
+                        ▼
+              PostgreSQL (Supabase) ◄──── accounts and watchlist
+                        │ reads                    ▲
+                        ▼                          │
+               FastAPI backend (Render)            │
+                        │ /offers, /free-games     │ supabase-js
+                        ▼                          │
+              React frontend (Vercel) ─────────────┘
+```
 
-**Deployment**
-- Frontend: Vercel
-- Backend: Render
-- Database: Supabase
-
-**Automation and version control**
-- Git and GitHub
-- GitHub Actions (CI and scheduled fetching of offers)
+The backend only reads. All writing to the offer tables is done by the fetch
+scripts. Login and the watchlist go straight from the browser to Supabase, so
+the backend is not involved in them.
 
 ## Project structure
 
 ```text
 GameGrab/
-├── .github/workflows/   # CI and the scheduled fetch jobs
-├── Skol_filer/          # Course-related documentation
-├── backend/             # FastAPI, database access and fetch scripts
-├── docs/                # Design images
-├── frontend/            # The React application
+├── .github/workflows/
+│   ├── ci.yml                 # Lint, build and load checks on every PR
+│   ├── fetch-offers.yml       # Runs fetch_offers.py every hour
+│   └── fetch-free-games.yml   # Runs fetch_free_games.py every day
+├── backend/
+│   ├── app/
+│   │   ├── main.py            # The FastAPI app and its endpoints
+│   │   ├── fetch_offers.py    # Fetches offers from CheapShark, Steam, GOG and Epic
+│   │   └── fetch_free_games.py# Fetches free-to-play games from Steam
+│   ├── schema.sql             # Creates the tables (safe to re-run)
+│   ├── requirements.txt
+│   └── .env.example
+├── frontend/
+│   ├── src/
+│   │   ├── App.tsx            # The page: tabs, search, filters, cards, details, watchlist
+│   │   ├── Account.tsx        # Log in, sign up, reset password
+│   │   ├── api.ts             # Calls to the backend
+│   │   ├── supabase.ts        # The Supabase client
+│   │   ├── appLink.ts         # Opens Steam links in the Steam app on mobile
+│   │   ├── types.ts           # The shapes of the data from the backend
+│   │   └── index.css
+│   ├── package.json
+│   └── .env.example
+├── Skol_filer/                # Course documents (team contract, experiment board)
 └── README.md
 ```
 
-## Local development
+## Running it locally
 
-### Backend
+You need Python 3.10 or later (CI uses 3.13), Node.js 20.19 or later, and access to the
+Supabase database.
 
-Go to the backend:
+### 1. Backend
 
 ```bash
 cd backend
-```
-
-Create a Python virtual environment:
-
-```bash
 python -m venv .venv
 ```
 
-Activate the virtual environment.
-
-On Windows:
+Activate the virtual environment. On Windows:
 
 ```bash
 .venv\Scripts\activate
@@ -90,243 +115,207 @@ On macOS/Linux:
 source .venv/bin/activate
 ```
 
-Install the backend dependencies:
+Install the dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Environment variables
+Copy `backend/.env.example` to `backend/.env` and fill in `DATABASE_URL`
+(see [Environment variables](#environment-variables)). If the database is new,
+run `backend/schema.sql` in Supabase's SQL editor first.
 
-The backend needs a connection to the PostgreSQL database in Supabase.
-
-Create the file `.env` in `backend/` and use `.env.example` as a template:
-
-```env
-DATABASE_URL=
-MIN_SAVINGS_PERCENT=80
-MAX_PER_SERIES=3
-CACHE_SECONDS=300
-```
-
-- `DATABASE_URL` (required): the database connection string from Supabase.
-- `MIN_SAVINGS_PERCENT` (optional, default 80): minimum discount for an offer to be shown.
-- `MAX_PER_SERIES` (optional, default 3): max number of near-identical titles (same series) shown. 0 turns the cap off.
-- `CACHE_SECONDS` (optional, default 300): how long `/offers` and `/free-games` keep their answer in memory before asking the database again. 0 turns the cache off.
-
-`.env` contains sensitive information and must not be pushed to GitHub.
-Never put real values in `.env.example`, since that file is pushed.
-
-Start the backend:
+Start the server:
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-The backend then runs locally on:
+The API runs on `http://localhost:8000`, and its interactive documentation is
+on `http://localhost:8000/docs`.
 
-```text
-http://localhost:8000
-```
+### 2. Frontend
 
-FastAPI's automatic API documentation is available at:
-
-```text
-http://localhost:8000/docs
-```
-
-### Frontend
-
-Open a new terminal and go to the frontend folder:
+In a new terminal:
 
 ```bash
 cd frontend
-```
-
-Install dependencies:
-
-```bash
 npm install
 ```
 
-Start the frontend:
+Copy `frontend/.env.example` to `frontend/.env.local` and fill in the Supabase
+values. The site works without them, but login and the watchlist are then
+turned off.
 
 ```bash
 npm run dev
 ```
 
-The frontend normally runs on:
+The site runs on `http://localhost:5173`.
 
-```text
-http://localhost:5173
-```
+### 3. Filling the database (optional)
 
-## Communication between frontend and backend
-
-The frontend communicates with the FastAPI backend through API requests.
-
-The backend has four endpoints:
-
-| Endpoint | Description |
-| --- | --- |
-| `GET /health` | Checks that the server works and can reach the database |
-| `GET /offers` | Current free games and big discounts, with what the cards need |
-| `GET /offers/{id}` | Description and system requirements for one offer, fetched when its details window opens |
-| `GET /free-games` | Popular games that are always free |
-
-All of them answer with status 503 and `"database": "disconnected"` if the
-database can't be reached, so the frontend never mistakes an outage for "no offers".
-Answers are gzip-compressed.
-
-`/health` is used to check that the FastAPI server works and that it can connect to the PostgreSQL database.
-
-If both the backend and the database work, it returns:
-
-```json
-{
-  "status": "ok",
-  "database": "connected"
-}
-```
-
-The frontend calls `/health` when the page loads and shows whether the connection works.
-
-The frontend can show three different states:
-
-- Checking the connection
-- Connected to backend and database
-- Connection error
-
-The backend address is set through the environment variable:
-
-```text
-VITE_API_URL
-```
-
-If no address has been set, the local backend server is used:
-
-```text
-http://localhost:8000
-```
-
-This lets the same frontend code be used both locally and when the project is deployed later.
-
-## Deployment
-
-The project will use the following structure:
-
-```text
-Frontend (React + TypeScript + Vite)
-                ↓
-              Vercel
-                ↓
-        Backend (FastAPI)
-                ↓
-              Render
-                ↓
-      PostgreSQL / Supabase
-```
-
-The frontend is deployed on Vercel and the backend is deployed separately on Render.
-
-Once the frontend is deployed, `VITE_API_URL` will point to the published FastAPI server on Render.
-
-The backend needs `DATABASE_URL` as an environment variable on Render to be able to connect to the database in Supabase.
-
-## Updating offers
-
-`backend/app/fetch_offers.py` fetches offers from CheapShark and saves them to the database. The script runs automatically every hour via the GitHub Actions job `.github/workflows/fetch-offers.yml` (it can also be started manually from there).
-
-For the job to reach the database, the repo secret `DATABASE_URL` must exist under **Settings → Secrets and variables → Actions** on GitHub and point to the same database the backend uses.
-
-Each run removes offers that are no longer listed on CheapShark, so the database always holds the result of the latest successful fetch. `/offers` shows that snapshot even if a scheduled run is delayed, and hides offers whose end date has passed.
-
-It also only shows free games and offers with at least `MIN_SAVINGS_PERCENT` percent off (default 80). Smaller discounts are saved in the database but not returned.
-
-## Popular free games
-
-Games that are always free (free to play) are handled separately from the offers, since CheapShark doesn't list them. `backend/app/fetch_free_games.py` searches Steam for free to play games, confirms each candidate with Steam's `appdetails` (a real game and `is_free`) and saves the 150 most popular in the `free_games` table. The job `.github/workflows/fetch-free-games.yml` runs it once a day and can also be started manually.
-
-The list is returned by `GET /free-games`, most popular first. It has no freshness check like `/offers`, since a free to play game doesn't stop being free overnight. The frontend shows it as a smaller section, "Popular free games", below the offers. The genre filter applies to both sections, the store filter only to the offers.
-
-The table is created by `backend/schema.sql`, which can be re-run without overwriting data. Manual run:
+The database is filled by the scheduled jobs, but the scripts can be run by hand
+from `backend/`:
 
 ```bash
-cd backend
+python -m app.fetch_offers
+```
+
+```bash
 python -m app.fetch_free_games
 ```
 
-## Accounts and login
+## Environment variables
 
-Visitors can create an account and log in with email and password. It's handled
-by Supabase Auth straight from the frontend (`frontend/src/supabase.ts` and
-`frontend/src/Account.tsx`), so the backend isn't involved yet. Everything else
-on the site works without an account.
+`.env` and `.env.local` contain secrets and are never pushed. The `.env.example`
+files are pushed, so never put real values in them.
 
-The frontend needs two environment variables. Locally they go in
-`frontend/.env.local` (use `frontend/.env.example` as a template), and on Vercel
-under Environment Variables:
+**Backend** (`backend/.env` locally, Environment on Render):
 
-```env
-VITE_SUPABASE_URL=https://<project>.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+| Variable | Required | Default | What it does |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | Yes | – | Connection string from Supabase (Project Settings → Database) |
+| `MIN_SAVINGS_PERCENT` | No | 80 | Smallest discount `/offers` returns. Free games are always shown. |
+| `MAX_PER_SERIES` | No | 3 | Max number of near-identical titles from one series. 0 turns it off. |
+| `CACHE_SECONDS` | No | 300 | How long `/offers` and `/free-games` are cached in memory. 0 turns it off. |
+
+`fetch_offers.py` only collects deals of at least 80% off, so setting
+`MIN_SAVINGS_PERCENT` below 80 shows nothing extra.
+
+**Frontend** (`frontend/.env.local` locally, Environment Variables on Vercel):
+
+| Variable | What it does |
+| --- | --- |
+| `VITE_API_URL` | The backend's address. Empty means `http://localhost:8000`. |
+| `VITE_SUPABASE_URL` | The Supabase project's URL |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | The publishable key (`sb_publishable_...`) |
+
+The Supabase values are found under **Project Settings → API Keys**. They end up
+in the visitor's browser and are not secret. The secret key (`sb_secret_...` or
+`service_role`) must never be put in the frontend.
+
+**GitHub** (Settings → Secrets and variables → Actions): the secret
+`DATABASE_URL`, pointing to the same database as the backend. The fetch jobs
+need it.
+
+## API
+
+| Endpoint | Description |
+| --- | --- |
+| `GET /health` | Checks that the server is up and can reach the database. Also answers `HEAD`, for uptime monitors. |
+| `GET /offers` | All current offers, with what the cards need |
+| `GET /offers/{id}` | Full description and system requirements for one offer, fetched when its details window opens |
+| `GET /free-games` | Free-to-play games, most played first |
+
+If the database can't be reached, every endpoint answers `503` with
+`"database": "disconnected"`, so the frontend shows an error instead of an empty
+list. Answers are gzip-compressed.
+
+`/offers` returns offers that are free or at least `MIN_SAVINGS_PERCENT` off and
+haven't passed their end date. They are sorted with free games first, then by
+discount, then by time left.
+
+A healthy `/health` answers:
+
+```json
+{ "status": "ok", "database": "connected" }
 ```
 
-Both are found in Supabase under **Project Settings → API Keys**. They are not
-secret, since they end up in the visitor's browser. The secret key
-(`sb_secret_...` / `service_role`) must never be put in the frontend.
+## How offers are collected
 
-The tables are protected by Row Level Security (see `backend/schema.sql`), so
-the publishable key can't be used to read or change them.
+`backend/app/fetch_offers.py` runs every hour through GitHub Actions
+(GitHub often starts scheduled jobs late, sometimes by hours). Each run:
+
+1. **Fetches deals from CheapShark.** It reads 8 pages of deals sorted by biggest
+   discount, and remembers where it stopped in the `fetch_state` table so the
+   next run continues from there. This keeps each run small enough that
+   CheapShark doesn't block it. Every run also fetches all free deals and all
+   Ubisoft deals.
+2. **Filters out what isn't a game.** Titles with words like DLC, Edition,
+   Bundle or Soundtrack are dropped. New deals are then looked up on Steam
+   (or GOG's catalog if the game isn't on Steam), which says whether it's a
+   real game, and gives genres, description and system requirements. At most
+   190 new deals are looked up per run, to stay under Steam's rate limit.
+   Deals that turn out not to be games are remembered in `skipped_deals`.
+3. **Filters out adult games** using Steam's content descriptors, the 18+ age
+   gate, and the title. Saved offers are re-checked every run.
+4. **Looks up end dates** from each store: Steam's store API, Epic's promotions
+   list, and the game page on GOG. Ubisoft doesn't provide one, so those show
+   "End date unknown".
+5. **Saves everything**, and updates Steam review scores for up to 50 games
+   (each game at most once a day).
+6. **Removes offers not seen for 48 hours.** A full pass over CheapShark's list
+   takes several runs, so an offer is only treated as ended when nobody has seen
+   it for two days. Offers whose end date has passed are hidden by `/offers`
+   right away.
+
+## Free-to-play games
+
+`backend/app/fetch_free_games.py` runs once a day. It searches Steam for games
+tagged Free to Play, confirms each one with Steam (a real game that is always
+free and not adult), and saves the 150 most played in `free_games`.
+Counter-Strike 2 is always included, and a few games outside Steam
+(League of Legends, VALORANT, Hearthstone and others) are added by hand.
+
+They show up in the All and Free tabs. The store and genre filters apply to
+them too.
+
+## Accounts and watchlist
+
+Accounts use Supabase Auth with email and password, straight from the
+frontend (`frontend/src/supabase.ts` and `frontend/src/Account.tsx`). Visitors
+can sign up, confirm their email, log in, log out and reset a forgotten
+password. Everything except the watchlist works without an account.
+
+The watchlist is stored in the Supabase table `watched_games`
+(`user_id`, `offer_id`, `title`, unique on `user_id` + `offer_id`). The frontend
+reads and writes it with the publishable key, so the table must have Row Level
+Security policies that only let a user see and change their own rows.
+
+The other tables (`offers`, `free_games`, `skipped_deals`, `fetch_state`) have
+Row Level Security turned on with no policies (see `backend/schema.sql`), so the
+publishable key can't read or change them. The backend and the fetch scripts
+connect as the `postgres` role, which bypasses RLS.
 
 Settings in the Supabase dashboard:
 
-- **Authentication → URL Configuration:** Site URL is the Vercel address.
-  Add `http://localhost:5173` under Redirect URLs, otherwise the link in the
-  confirmation email doesn't work locally.
+- **Authentication → URL Configuration:** Site URL is the Vercel address. Add
+  `http://localhost:5173` under Redirect URLs, or the email links won't work
+  locally.
 - **Authentication → Sign In / Providers → Email:** keep "Confirm email" on.
-- **Authentication → Policies (password):** minimum length 8, the same as the form.
+- **Authentication → Policies:** minimum password length 8, the same as the form.
 
-Supabase's built-in email sender only sends a few emails per hour and is meant
-for testing. Before launch, set up your own SMTP under **Authentication → Emails**.
+Supabase's built-in email sender only allows a few emails per hour and is meant
+for testing. For real use, set up your own SMTP under **Authentication → Emails**.
 
-## CORS
+## Deployment
 
-During local development the backend allows requests from:
+- **Frontend on Vercel:** root directory `frontend`, build command
+  `npm run build`, output `dist`. Set the three `VITE_` variables.
+- **Backend on Render:** a web service with root directory `backend`, build command
+  `pip install -r requirements.txt`, start command
+  `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Set `DATABASE_URL`.
+  On Render's free plan the server sleeps when idle, so the first visit can take
+  up to a minute. The page says so while it waits.
+- **Database on Supabase:** run `backend/schema.sql` once in the SQL editor.
 
-```text
-http://localhost:5173
-```
-
-and from the deployed frontend:
-
-```text
-https://gamegrab.vercel.app
-```
-
-The list of allowed origins is in `backend/app/main.py`. If the frontend moves to
-another address, add it there.
+The backend only accepts requests from `http://localhost:5173` and
+`https://gamegrab.vercel.app` (CORS). If the frontend moves, add the new address
+to `allow_origins` in `backend/app/main.py`.
 
 ## Checks (CI)
 
-`.github/workflows/ci.yml` runs on every pull request against `main` and on every
+`.github/workflows/ci.yml` runs on every pull request against `main` and every
 push to `main`:
 
-- **Frontend:** `npm ci`, lint (`oxlint`) and the build, which also type-checks with TypeScript.
-- **Backend:** installs the dependencies, checks the syntax and checks that the app loads.
+- **Frontend:** `npm ci`, lint with `oxlint`, and `npm run build`, which also
+  type-checks with TypeScript.
+- **Backend:** installs the dependencies, checks the syntax, and checks that the
+  app and fetch scripts load.
 
-## Project status
+## Workflow
 
-The project is under development.
-
-Currently in place:
-
-- React + TypeScript + Vite frontend
-- FastAPI backend with PostgreSQL via SQLAlchemy and Supabase
-- `/health`, `/offers` and `/free-games` endpoints
-- Offers fetched from CheapShark every hour, popular free games from Steam every day
-- Steam review scores, genre and store filters, and pagination
-- Filtering of adult games and of small discounts
-- Accounts and login through Supabase Auth
-- CI on every pull request
-- Support for different backend addresses through `VITE_API_URL`
+The team worked in sprints with a Jira board. Each task got a branch named after
+its ticket (for example `fix/SCRUM-64-filter-scroll`), was merged to `main`
+through a pull request, and had to pass CI first.
