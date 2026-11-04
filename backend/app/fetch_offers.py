@@ -21,6 +21,7 @@ from sqlalchemy import create_engine, text
 import json
 import time
 import os
+import socket
 from html import unescape
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -543,12 +544,7 @@ MAX_WAIT = 120
 
 
 def fetch_page(**params) -> list[dict]:
-    """Sends one query to CheapShark and returns the response as a list.
-
-    CheapShark answers 429 when we go too fast, so we back off and try again.
-    If it still fails we raise instead of returning a partial result, so
-    nothing is saved and the cursor doesn't move.
-    """
+    """Fetches one page from CheapShark with retries for temporary errors."""
     url = f"{API}?{urlencode(params)}"
     request = Request(url, headers={"User-Agent": USER_AGENT})
 
@@ -556,28 +552,51 @@ def fetch_page(**params) -> list[dict]:
         try:
             with urlopen(request, timeout=30) as response:
                 return json.load(response)
+
         except HTTPError as error:
-            # 400 is not retried: CheapShark answers it for a page past the end
-            # of the list, and collect() handles that by starting over.
+            # Don't retry permanent HTTP errors, including 400.
             if error.code not in (429, 500, 502, 503) or attempt == 4:
                 print(f"CheapShark request failed: {url}", flush=True)
                 print(f"HTTP status: {error.code}", flush=True)
                 raise
 
-            # When blocked, CheapShark says how long in Retry-After (seconds).
-            # A short wait is worth sitting out; a long one (it can be nearly
-            # an hour) is not – better to stop now and let the next run try.
             retry_after = error.headers.get("Retry-After")
+
             if retry_after and retry_after.isdigit():
                 if int(retry_after) > MAX_WAIT:
                     raise RuntimeError(
                         f"CheapShark has blocked us for {retry_after} seconds "
                         "(rate limit). Nothing was changed; try again later."
                     ) from error
-                time.sleep(int(retry_after) + 1)
-            else:
-                time.sleep(10 * 2**attempt)
 
+                wait = int(retry_after) + 1
+            else:
+                wait = 10 * 2**attempt
+
+            print(
+                f"CheapShark HTTP {error.code}. "
+                f"Retrying in {wait} seconds...",
+                flush=True,
+            )
+            time.sleep(wait)
+
+        except (TimeoutError, socket.timeout) as error:
+            if attempt == 4:
+                print(
+                    f"CheapShark timed out after 5 attempts: {url}",
+                    flush=True,
+                )
+                raise
+
+            wait = 5 * 2**attempt
+
+            print(
+                f"CheapShark request timed out. "
+                f"Retrying in {wait} seconds "
+                f"(attempt {attempt + 1}/5)...",
+                flush=True,
+            )
+            time.sleep(wait)
 
 # CheapShark allows at most 60 deals per page.
 PAGE_SIZE = 60
