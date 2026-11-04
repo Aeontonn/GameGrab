@@ -193,6 +193,22 @@ header p {
   font-weight: 700;
 }
 
+/* "Forgot password?": looks like a text link, not a button. */
+.auth-form button.link-button {
+  align-self: flex-start;
+  margin-top: -6px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--text-dim);
+  text-decoration: underline;
+}
+
+.auth-form button.link-button:hover {
+  color: var(--text);
+}
+
 .auth-form button:disabled {
   opacity: 0.6;
   cursor: default;
@@ -890,6 +906,9 @@ input[type="search"]::-webkit-search-cancel-button {
 .filter-menu-content {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Keep the row as tall as the space between header and footer, so a long
+     column scrolls instead of spilling over the counts and buttons. */
+  grid-template-rows: minmax(0, 1fr);
   flex: 1;
   min-height: 0;
   padding: 28px 0;
@@ -898,7 +917,7 @@ input[type="search"]::-webkit-search-cancel-button {
 .filter-menu-section {
   min-width: 0;
   padding: 0 36px;
-  overflow: visible;
+  overflow-y: auto;
 }
 
 .filter-menu-section:first-child {
@@ -1227,6 +1246,7 @@ input[type="search"]::-webkit-search-cancel-button {
 
   .filter-menu-content {
     grid-template-columns: 1fr;
+    grid-template-rows: none;
     overflow-y: auto;
     padding: 18px 0;
   }

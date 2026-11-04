@@ -1,7 +1,7 @@
 import type { FreeGame, Offer, OfferDetails } from './types'
 
 // The backend address. Set as an environment variable on deploy, otherwise the local server.
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export { API_URL }
 
